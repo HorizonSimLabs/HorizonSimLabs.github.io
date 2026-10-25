@@ -234,7 +234,7 @@
             roam: true,
             zoom: isProvince ? 1.1 : (isMobile ? 1.2 : 1.5), // 手机端稍微缩小一点
             center: isProvince ? undefined : [104, 36],
-            label: { show: !isMobile, fontSize: 10, color: '#333' }, // 手机端隐藏小字防止杂乱
+            label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333' }, // 手机端字号调小到7
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
             selectedMode: false, 
             emphasis: { itemStyle: { areaColor: 'inherit' } },
