@@ -36,6 +36,7 @@
     
     const provinceDataMap = {};
     let allParsedData = []; 
+    let allowedDrillProvinces = new Set(); // ★ 核心：记录哪些省份有市级数据，允许下钻
 
     const provinceShortMap = {
       '北京市': '北京', '天津市': '天津', '上海市': '上海', '重庆市': '重庆',
@@ -109,7 +110,6 @@
       }
     }
 
-    // ★ 新增 remark 参数
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
       let html = '<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【' + rawProvince + '】</div>';
       html += '<div>作者：' + author + '</div>';
@@ -122,7 +122,6 @@
         html += '<div style="margin-left:10px;">付费版' + (paidLevel ? '（' + paidLevel + '）' : '') + '：' + formatDownload(paidLink) + '</div>';
       }
       
-      // ★ 如果有备注，就显示在最下面
       if (remark) {
         html += '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">备注：' + remark + '</div>';
       }
@@ -161,7 +160,6 @@
             if (completedProvincesShort.includes(featureShort)) {
               mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
               const matchItem = allParsedData.find(item => provinceShortMap[item.rawProvince] === featureShort);
-              // ★ 传入备注
               if (matchItem) provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
             } else {
               const hasCityCompleted = allParsedData.some(item => {
@@ -185,7 +183,6 @@
             const matchItem = allParsedData.find(item => item.rawProvince.replace(/市$/, '') === featureShortCity);
             if (matchItem) {
               mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-              // ★ 传入备注
               provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
             }
           }
@@ -244,12 +241,14 @@
             freeLevel: parts[3] || '',
             paidLink: parts[4] || '',
             paidLevel: parts[5] || '',
-            remark: parts[6] || '' // ★ 读取第 7 个字段作为备注
+            remark: parts[6] || ''
           };
 
           const cleanName = rawProvince.replace(/市$/, '');
+          // ★ 核心判断：如果这行写的是个市，记录下来，并把这个市所属的省份加入“允许下钻名单”
           if (superCityMap[cleanName]) {
             itemData.provinceName = superCityMap[cleanName];
+            allowedDrillProvinces.add(itemData.provinceName);
           } else {
             itemData.provinceName = rawProvince;
           }
@@ -271,10 +270,23 @@
     myChart.on('click', function (params) {
       const now = new Date().getTime();
       const provinceName = params.name;
+      
+      // 检查当前点击的省份有没有资格下钻（是否在允许名单里）
+      let currentProvShort = provinceShortMap[provinceName] || provinceName.replace(/(省|市|自治区|特别行政区)/g, '');
+      let canDrill = false;
+      
+      for (let prov of allowedDrillProvinces) {
+        let pShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
+        if (pShort === currentProvShort) {
+          canDrill = true;
+          break;
+        }
+      }
 
       if (isMobile) {
         if (now - lastClickTime < 300 && lastClickName === provinceName) {
-          if (backBtn.style.display === 'none') {
+          // 双击触发下钻
+          if (canDrill && backBtn.style.display === 'none') {
              let mapId = null;
              for (let key in provinceCodeMap) {
                if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
@@ -288,6 +300,7 @@
              }
           }
         } else {
+          // 单击看信息
           if (provinceDataMap[provinceName]) {
             tooltipEl.innerHTML = provinceDataMap[provinceName];
             tooltipEl.style.display = 'block';
@@ -302,7 +315,8 @@
         lastClickTime = now;
         lastClickName = provinceName;
       } else {
-        if (backBtn.style.display === 'none') {
+        // 电脑端单击触发下钻
+        if (canDrill && backBtn.style.display === 'none') {
           let mapId = null;
           for (let key in provinceCodeMap) {
             if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
