@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HorizonSimLabs - 飞机</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #0f172a;
+            color: #fff;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+        }
+        h2 { font-size: 2.5rem; margin-bottom: 2rem; color: #e2e8f0; }
+        .btn-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            background: #a78bfa;
+            border-color: #a78bfa;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(167, 139, 250, 0.4);
+        }
+        .back-link {
+            margin-top: 3rem;
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: 0.3s;
+        }
+        .back-link:hover { color: #fff; }
+    </style>
+</head>
+<body>
+    <h2>飞机资源</h2>
+    <div class="btn-group">
+        <a href="./plane/skin.html" class="btn">涂装</a>
+        <a href="./plane/function.html" class="btn">功能</a>
+        <a href="./plane/sound.html" class="btn">音效</a>
+    </div>
+    <a href="./index.html" class="back-link">← 返回主页</a>
+</body>
+</html>
