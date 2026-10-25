@@ -69,7 +69,6 @@
       '新疆维吾尔自治区': 650000, '台湾省': 710000, '香港特别行政区': 810000, '澳门特别行政区': 820000
     };
 
-    // ★ 超级字典：全国所有地级市（及部分省直辖县级市），保证任何市都能反查到省
     const superCityMap = {
       '石家庄': '河北省', '唐山': '河北省', '秦皇岛': '河北省', '邯郸': '河北省', '邢台': '河北省', '保定': '河北省', '张家口': '河北省', '承德': '河北省', '沧州': '河北省', '廊坊': '河北省', '衡水': '河北省',
       '太原': '山西省', '大同': '山西省', '阳泉': '山西省', '长治': '山西省', '晋城': '山西省', '朔州': '山西省', '晋中': '山西省', '运城': '山西省', '忻州': '山西省', '临汾': '山西省', '吕梁': '山西省',
@@ -110,7 +109,8 @@
       }
     }
 
-    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel) {
+    // ★ 新增 remark 参数
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
       let html = '<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【' + rawProvince + '】</div>';
       html += '<div>作者：' + author + '</div>';
       html += '<div>下载方式：</div>';
@@ -121,6 +121,12 @@
       if (paidLink || paidLevel) {
         html += '<div style="margin-left:10px;">付费版' + (paidLevel ? '（' + paidLevel + '）' : '') + '：' + formatDownload(paidLink) + '</div>';
       }
+      
+      // ★ 如果有备注，就显示在最下面
+      if (remark) {
+        html += '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">备注：' + remark + '</div>';
+      }
+      
       return html;
     }
 
@@ -155,7 +161,8 @@
             if (completedProvincesShort.includes(featureShort)) {
               mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
               const matchItem = allParsedData.find(item => provinceShortMap[item.rawProvince] === featureShort);
-              if (matchItem) provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel);
+              // ★ 传入备注
+              if (matchItem) provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
             } else {
               const hasCityCompleted = allParsedData.some(item => {
                 if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
@@ -178,7 +185,8 @@
             const matchItem = allParsedData.find(item => item.rawProvince.replace(/市$/, '') === featureShortCity);
             if (matchItem) {
               mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-              provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel);
+              // ★ 传入备注
+              provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
             }
           }
         });
@@ -192,7 +200,6 @@
             roam: true,
             zoom: isProvince ? 1.1 : (isMobile ? 1.2 : 1.5),
             center: isProvince ? undefined : [104, 36],
-            // ★ 修改了这里：手机端显示文字，字号调小
             label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333' }, 
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
             selectedMode: false, 
@@ -236,7 +243,8 @@
             freeLink: parts[2] || '',
             freeLevel: parts[3] || '',
             paidLink: parts[4] || '',
-            paidLevel: parts[5] || ''
+            paidLevel: parts[5] || '',
+            remark: parts[6] || '' // ★ 读取第 7 个字段作为备注
           };
 
           const cleanName = rawProvince.replace(/市$/, '');
