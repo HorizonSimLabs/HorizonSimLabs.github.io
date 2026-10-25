@@ -36,7 +36,7 @@
     
     const provinceDataMap = {};
     let allParsedData = []; 
-    let allowedDrillProvinces = new Set(); // ★ 核心：记录哪些省份有市级数据，允许下钻
+    let allowedDrillProvinces = new Set(); 
 
     const provinceShortMap = {
       '北京市': '北京', '天津市': '天津', '上海市': '上海', '重庆市': '重庆',
@@ -84,7 +84,7 @@
       '南昌': '江西省', '景德镇': '江西省', '萍乡': '江西省', '九江': '江西省', '新余': '江西省', '鹰潭': '江西省', '赣州': '江西省', '吉安': '江西省', '宜春': '江西省', '抚州': '江西省', '上饶': '江西省',
       '济南': '山东省', '青岛': '山东省', '淄博': '山东省', '枣庄': '山东省', '东营': '山东省', '烟台': '山东省', '潍坊': '山东省', '济宁': '山东省', '泰安': '山东省', '威海': '山东省', '日照': '山东省', '临沂': '山东省', '德州': '山东省', '聊城': '山东省', '滨州': '山东省', '菏泽': '山东省',
       '郑州': '河南省', '开封': '河南省', '洛阳': '河南省', '平顶山': '河南省', '安阳': '河南省', '鹤壁': '河南省', '新乡': '河南省', '焦作': '河南省', '濮阳': '河南省', '许昌': '河南省', '漯河': '河南省', '三门峡': '河南省', '南阳': '河南省', '商丘': '河南省', '信阳': '河南省', '周口': '河南省', '驻马店': '河南省',
-      '武汉': '湖北省', '黄石': '湖北省', '十堰': '湖北省', '宜昌': '湖北省', '襄阳': '湖北省', '鄂州': '湖北省', '荆门': '湖北省', '孝感': '湖北省', '荆州': '湖北省', '黄冈': '湖北省', '咸宁': '湖北省', '随州': '湖北省',
+      '武汉': '湖北省', '黄石': '湖北省', '十堰': '湖北省', '宜昌': '湖北省', '襄阳': '湖北省', '鄂州': '湖北省', '荆门': '湖北省', '孝感': '湖北省', '荆州': '湖北省', '黄冈': '湖北省', '咸宁': '湖北省', '随州': '湖北省', '恩施': '湖北省', '仙桃': '湖北省', '潜江': '湖北省', '天门': '湖北省', '神农架': '湖北省',
       '长沙': '湖南省', '株洲': '湖南省', '湘潭': '湖南省', '衡阳': '湖南省', '邵阳': '湖南省', '岳阳': '湖南省', '常德': '湖南省', '张家界': '湖南省', '益阳': '湖南省', '郴州': '湖南省', '永州': '湖南省', '怀化': '湖南省', '娄底': '湖南省',
       '广州': '广东省', '韶关': '广东省', '深圳': '广东省', '珠海': '广东省', '汕头': '广东省', '佛山': '广东省', '江门': '广东省', '湛江': '广东省', '茂名': '广东省', '肇庆': '广东省', '惠州': '广东省', '梅州': '广东省', '汕尾': '广东省', '河源': '广东省', '阳江': '广东省', '清远': '广东省', '东莞': '广东省', '中山': '广东省', '潮州': '广东省', '揭阳': '广东省', '云浮': '广东省',
       '南宁': '广西壮族自治区', '柳州': '广西壮族自治区', '桂林': '广西壮族自治区', '梧州': '广西壮族自治区', '北海': '广西壮族自治区', '防城港': '广西壮族自治区', '钦州': '广西壮族自治区', '贵港': '广西壮族自治区', '玉林': '广西壮族自治区', '百色': '广西壮族自治区', '贺州': '广西壮族自治区', '河池': '广西壮族自治区', '来宾': '广西壮族自治区', '崇左': '广西壮族自治区',
@@ -164,7 +164,7 @@
             } else {
               const hasCityCompleted = allParsedData.some(item => {
                 if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
-                const cleanName = item.rawProvince.replace(/市$/, '');
+                const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
                 const prov = superCityMap[cleanName];
                 if (prov) {
                   const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
@@ -179,8 +179,20 @@
             }
           } 
           else {
-            const featureShortCity = featureName.replace(/市$/, '');
-            const matchItem = allParsedData.find(item => item.rawProvince.replace(/市$/, '') === featureShortCity);
+            // ★ 核心修改：市级地图匹配
+            const matchItem = allParsedData.find(item => {
+              const itemRaw = item.rawProvince;
+              const fRaw = featureName;
+              
+              // 强制拦截：如果底图叫“恩施土家族苗族自治州”，且 JSON 里包含“恩施”，直接算匹配
+              if (fRaw.includes('恩施') && itemRaw.includes('恩施')) return true;
+              
+              const itemClean = itemRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              const fClean = fRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              
+              return itemClean === fClean || itemClean.includes(fClean) || fClean.includes(itemClean);
+            });
+            
             if (matchItem) {
               mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
               provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
@@ -244,8 +256,7 @@
             remark: parts[6] || ''
           };
 
-          const cleanName = rawProvince.replace(/市$/, '');
-          // ★ 核心判断：如果这行写的是个市，记录下来，并把这个市所属的省份加入“允许下钻名单”
+          const cleanName = rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
           if (superCityMap[cleanName]) {
             itemData.provinceName = superCityMap[cleanName];
             allowedDrillProvinces.add(itemData.provinceName);
@@ -271,7 +282,6 @@
       const now = new Date().getTime();
       const provinceName = params.name;
       
-      // 检查当前点击的省份有没有资格下钻（是否在允许名单里）
       let currentProvShort = provinceShortMap[provinceName] || provinceName.replace(/(省|市|自治区|特别行政区)/g, '');
       let canDrill = false;
       
@@ -285,7 +295,6 @@
 
       if (isMobile) {
         if (now - lastClickTime < 300 && lastClickName === provinceName) {
-          // 双击触发下钻
           if (canDrill && backBtn.style.display === 'none') {
              let mapId = null;
              for (let key in provinceCodeMap) {
@@ -300,7 +309,6 @@
              }
           }
         } else {
-          // 单击看信息
           if (provinceDataMap[provinceName]) {
             tooltipEl.innerHTML = provinceDataMap[provinceName];
             tooltipEl.style.display = 'block';
@@ -315,7 +323,6 @@
         lastClickTime = now;
         lastClickName = provinceName;
       } else {
-        // 电脑端单击触发下钻
         if (canDrill && backBtn.style.display === 'none') {
           let mapId = null;
           for (let key in provinceCodeMap) {
