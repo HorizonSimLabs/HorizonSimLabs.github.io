@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- ★ 核心修复：禁止发送 Referrer，绕过阿里云防盗链 403 -->
+  <meta name="referrer" content="no-referrer" />
   <title>中国地景</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
   <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
@@ -155,8 +157,9 @@
           : 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
         
         const res = await fetch(url);
+        if (!res.ok) throw new Error('网络请求失败: ' + res.status);
+        
         const geoJson = await res.json();
-
         echarts.registerMap(mapName, geoJson);
         
         const features = geoJson.features.map(f => f.properties.name);
@@ -179,7 +182,6 @@
             } else {
               const hasCityCompleted = allParsedData.some(item => {
                 if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
-                
                 const cleanName = item.rawProvince.replace(/市$/, '');
                 const prov = superCityMap[cleanName];
                 if (prov) {
@@ -231,50 +233,49 @@
 
     async function init() {
       try {
-        // ★ 核心修改：尝试读取 ./done.json 或 ./cn/done.json
-        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
+        // ★ 双保险路径读取
+        let doneRes = await fetch('./cn/done.json?t=' + new Date().getTime());
         if (!doneRes.ok) {
-          doneRes = await fetch('./cn/done.json?t=' + new Date().getTime());
+          doneRes = await fetch('./done.json?t=' + new Date().getTime());
         }
         
-        if (doneRes.ok) {
-          let text = await doneRes.text();
-          text = text.replace(/[\[\]"'\r\n]/g, '').trim(); 
-          const lines = text.split(',');
+        if (!doneRes.ok) throw new Error('找不到 done.json (状态码 ' + doneRes.status + ')');
+        
+        let text = await doneRes.text();
+        text = text.replace(/[\[\]"'\r\n]/g, '').trim(); 
+        const lines = text.split(',');
 
-          lines.forEach(line => {
-            let rawLine = line.trim();
-            if (!rawLine) return;
+        lines.forEach(line => {
+          let rawLine = line.trim();
+          if (!rawLine) return;
 
-            rawLine = rawLine.replace(/；/g, ';'); 
-            const parts = rawLine.split(';'); 
-            
-            const rawProvince = parts[0].trim();
-            const itemData = {
-              rawProvince: rawProvince,
-              author: parts[1] || '未知',
-              freeLink: parts[2] || '',
-              freeLevel: parts[3] || '',
-              paidLink: parts[4] || '',
-              paidLevel: parts[5] || ''
-            };
+          rawLine = rawLine.replace(/；/g, ';'); 
+          const parts = rawLine.split(';'); 
+          
+          const rawProvince = parts[0].trim();
+          const itemData = {
+            rawProvince: rawProvince,
+            author: parts[1] || '未知',
+            freeLink: parts[2] || '',
+            freeLevel: parts[3] || '',
+            paidLink: parts[4] || '',
+            paidLevel: parts[5] || ''
+          };
 
-            const cleanName = rawProvince.replace(/市$/, '');
-            if (superCityMap[cleanName]) {
-              itemData.provinceName = superCityMap[cleanName];
-            } else {
-              itemData.provinceName = rawProvince;
-            }
+          const cleanName = rawProvince.replace(/市$/, '');
+          if (superCityMap[cleanName]) {
+            itemData.provinceName = superCityMap[cleanName];
+          } else {
+            itemData.provinceName = rawProvince;
+          }
 
-            allParsedData.push(itemData);
-          });
-        } else {
-          console.warn("未找到 done.json，请检查路径。");
-        }
+          allParsedData.push(itemData);
+        });
       } catch (e) {
-        console.error("读取 done.json 失败", e);
+        console.error("读取 done.json 失败，请确认文件是否已上传到正确位置", e);
       }
 
+      // 开始渲染地图
       renderMap('china', null, false);
     }
 
