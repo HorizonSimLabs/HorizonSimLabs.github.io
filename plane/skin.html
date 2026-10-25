@@ -7,23 +7,14 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            background: #0f172a;
-            color: #fff;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            min-height: 100vh;
-            background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            background: #0f172a; color: #fff; font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
             padding: 30px 20px;
         }
-
-        /* 头部和返回按钮 */
         .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            max-width: 1200px;
-            margin: 0 auto 30px auto;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 20px;
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 1200px; margin: 0 auto 30px auto;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 20px;
         }
         h2 { font-size: 2rem; color: #e2e8f0; }
         .back-link {
@@ -32,108 +23,43 @@
         }
         .back-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
 
-        /* 筛选区域 */
         .filter-bar {
-            max-width: 1200px;
-            margin: 0 auto 30px auto;
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            background: rgba(30, 41, 59, 0.6);
-            padding: 15px 20px;
-            border-radius: 12px;
+            max-width: 1200px; margin: 0 auto 30px auto;
+            display: flex; gap: 20px; flex-wrap: wrap;
+            background: rgba(30, 41, 59, 0.6); padding: 15px 20px; border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            flex: 1;
-            min-width: 200px;
-        }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
         .filter-group label { font-size: 0.85rem; color: #94a3b8; font-weight: bold; }
         .filter-group select {
-            background: #1e293b;
-            color: #fff;
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 6px;
-            padding: 10px;
-            font-size: 0.95rem;
-            outline: none;
-            cursor: pointer;
-            transition: 0.3s;
+            background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px; padding: 10px; font-size: 0.95rem; outline: none; cursor: pointer; transition: 0.3s;
         }
         .filter-group select:focus { border-color: #3b82f6; }
 
-        /* 卡片网格布局 */
         .skin-grid {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 25px;
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;
         }
-
-        /* 单个卡片样式 */
         .skin-card {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            overflow: hidden;
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
+            background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column;
         }
-        .skin-card:hover {
-            transform: translateY(-5px);
-            border-color: #3b82f6;
-            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2);
-        }
-        .card-image {
-            width: 100%;
-            height: 160px;
-            object-fit: cover;
-            background: #0f172a;
-        }
+        .skin-card:hover { transform: translateY(-5px); border-color: #3b82f6; box-shadow: 0 10px 25px rgba(59, 130, 246, 0.2); }
+        
+        /* 图片容器 */
+        .card-image { width: 100%; height: 160px; object-fit: cover; background: #0f172a; }
+        
         .card-content { padding: 15px; flex: 1; display: flex; flex-direction: column; }
-        .card-title {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #fff;
-            margin-bottom: 10px;
-            line-height: 1.4;
-        }
-        .card-info {
-            font-size: 0.85rem;
-            color: #94a3b8;
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            flex: 1;
-        }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #fff; margin-bottom: 10px; line-height: 1.4; }
+        .card-info { font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
         .card-info span { color: #cbd5e1; font-weight: 500; }
         .download-btn {
-            display: block;
-            text-align: center;
-            padding: 10px;
-            background: #3b82f6;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 6px;
-            font-weight: bold;
-            transition: background 0.3s;
+            display: block; text-align: center; padding: 10px;
+            background: #3b82f6; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background 0.3s;
         }
         .download-btn:hover { background: #2563eb; }
-
-        /* 空状态提示 */
-        .empty-state {
-            grid-column: 1 / -1;
-            text-align: center;
-            padding: 50px;
-            color: #94a3b8;
-            font-size: 1.1rem;
-        }
+        .empty-state { grid-column: 1 / -1; text-align: center; padding: 50px; color: #94a3b8; font-size: 1.1rem; }
     </style>
 </head>
 <body>
@@ -142,94 +68,81 @@
         <a href="../plane.html" class="back-link">← 返回飞机分类</a>
     </div>
 
-    <!-- 筛选栏 -->
     <div class="filter-bar">
         <div class="filter-group">
             <label>机型 (Aircraft)</label>
-            <select id="filter-aircraft">
-                <option value="all">全部机型</option>
-            </select>
+            <select id="filter-aircraft"><option value="all">全部机型</option></select>
         </div>
         <div class="filter-group">
             <label>航司 (Airline)</label>
-            <select id="filter-airline">
-                <option value="all">全部航司</option>
-            </select>
+            <select id="filter-airline"><option value="all">全部航司</option></select>
         </div>
         <div class="filter-group">
             <label>作者 (Author)</label>
-            <select id="filter-author">
-                <option value="all">全部作者</option>
-            </select>
+            <select id="filter-author"><option value="all">全部作者</option></select>
         </div>
     </div>
 
-    <!-- 涂装列表 -->
     <div class="skin-grid" id="skin-list">
         <div class="empty-state">正在加载涂装数据...</div>
     </div>
 
     <script>
-        let allSkins = []; // 存放所有的原始数据
+        let allSkins = [];
 
-        // 初始化加载
+        // 处理图片加载失败（显示灰色占位图）
+        function imgError(img) {
+            img.onerror = null; 
+            img.src = 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22280%22%20height%3D%22160%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20fill%3D%22%231e293b%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20font-size%3D%2214%22%20fill%3D%22%2364748b%22%20text-anchor%3D%22middle%22%20alignment-baseline%3D%22middle%22%3E%E6%9A%82%E6%97%A0%E5%9B%BE%E7%89%87%3C%2Ftext%3E%3C%2Fsvg%3E';
+        }
+
         async function init() {
             try {
-                // 加时间戳防缓存
                 const res = await fetch('./skin.json?t=' + new Date().getTime());
                 if (!res.ok) throw new Error('找不到 skin.json');
-                
                 allSkins = await res.json();
-                if (!Array.isArray(allSkins)) throw new Error('skin.json 必须是数组');
-
-                // 1. 动态生成筛选下拉框的选项
+                if (!Array.isArray(allSkins)) throw new Error('必须是数组');
+                
                 populateFilters(allSkins);
-                
-                // 2. 初次渲染所有卡片
                 renderCards(allSkins);
-                
-                // 3. 绑定筛选事件
                 bindFilterEvents();
-
             } catch (e) {
                 console.error(e);
-                document.getElementById('skin-list').innerHTML = `
-                    <div class="empty-state" style="color:#f87171;">
-                        加载失败！请确保 plane 目录下存在 skin.json 且格式正确。
-                    </div>`;
+                document.getElementById('skin-list').innerHTML = `<div class="empty-state" style="color:#f87171;">加载失败！请确保存在 skin.json 且格式正确。</div>`;
             }
         }
 
-        // 提取数据并填充下拉框
+        // 提取筛选选项
         function populateFilters(data) {
             const aircrafts = [...new Set(data.map(item => item.aircraft))].filter(Boolean);
             const airlines = [...new Set(data.map(item => item.airline))].filter(Boolean);
             const authors = [...new Set(data.map(item => item.author))].filter(Boolean);
-
+            
             const selAircraft = document.getElementById('filter-aircraft');
             const selAirline = document.getElementById('filter-airline');
             const selAuthor = document.getElementById('filter-author');
-
+            
             aircrafts.forEach(val => selAircraft.innerHTML += `<option value="${val}">${val}</option>`);
             airlines.forEach(val => selAirline.innerHTML += `<option value="${val}">${val}</option>`);
             authors.forEach(val => selAuthor.innerHTML += `<option value="${val}">${val}</option>`);
         }
 
-        // 渲染卡片列表
+        // 渲染卡片
         function renderCards(data) {
             const listEl = document.getElementById('skin-list');
-            
             if (data.length === 0) {
                 listEl.innerHTML = '<div class="empty-state">没有找到符合条件的涂装。</div>';
                 return;
             }
-
+            
             let html = '';
             data.forEach(item => {
+                // 处理图片路径，如果没填就留空触发占位图逻辑
+                const imgSrc = item.image || '';
+                
                 html += `
                     <div class="skin-card">
-                        <!-- 如果有图片就显示，没有就用默认灰色背景 -->
-                        ${item.image ? `<img src="${item.image}" class="card-image" alt="${item.name}">` : `<div class="card-image"></div>`}
+                        <img src="${imgSrc}" class="card-image" onerror="imgError(this)" alt="${item.name}">
                         <div class="card-content">
                             <div class="card-title">${item.name || '未命名涂装'}</div>
                             <div class="card-info">
@@ -245,32 +158,31 @@
             listEl.innerHTML = html;
         }
 
-        // 绑定下拉框的筛选逻辑
+        // 筛选逻辑
         function bindFilterEvents() {
             const selAircraft = document.getElementById('filter-aircraft');
             const selAirline = document.getElementById('filter-airline');
             const selAuthor = document.getElementById('filter-author');
-
+            
             function applyFilters() {
                 const a = selAircraft.value;
                 const l = selAirline.value;
                 const u = selAuthor.value;
-
+                
                 const filtered = allSkins.filter(item => {
                     const matchAircraft = (a === 'all' || item.aircraft === a);
                     const matchAirline = (l === 'all' || item.airline === l);
                     const matchAuthor = (u === 'all' || item.author === u);
                     return matchAircraft && matchAirline && matchAuthor;
                 });
-
                 renderCards(filtered);
             }
-
+            
             selAircraft.addEventListener('change', applyFilters);
             selAirline.addEventListener('change', applyFilters);
             selAuthor.addEventListener('change', applyFilters);
         }
-
+        
         init();
     </script>
 </body>
