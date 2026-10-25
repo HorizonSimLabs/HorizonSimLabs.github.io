@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>中国地景</title>
+  <link rel="icon" href="HorizonSimLabs.png" type="image/png">
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+    
+    #my-tooltip {
+      position: fixed;
+      background: #fff;
+      border: 2px solid #1890ff;
+      border-radius: 6px;
+      padding: 12px;
+      font: 14px/1.8 system-ui, sans-serif;
+      color: #333;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      display: none;
+      pointer-events: auto; 
+      z-index: 99999;
+      white-space: nowrap;
+    }
+    
+    .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
+    .my-link:hover { text-decoration: underline; }
+
+    #back-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 10px 20px;
+      background: #1890ff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font: 14px system-ui, sans-serif;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      display: none;
+      z-index: 9999;
+    }
+    #back-btn:hover { background: #40a9ff; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+  <button id="back-btn">← 返回全国</button>
+
+  <script>
+    const tooltipEl = document.getElementById('my-tooltip');
+    const backBtn = document.getElementById('back-btn');
+    
+    const provinceDataMap = {};
+    let allParsedData = []; 
+
+    const provinceShortMap = {
+      '北京市': '北京', '天津市': '天津', '上海市': '上海', '重庆市': '重庆',
+      '河北省': '河北', '山西省': '山西', '辽宁省': '辽宁', '吉林省': '吉林',
+      '黑龙江省': '黑龙江', '江苏省': '江苏', '浙江省': '浙江', '安徽省': '安徽',
+      '福建省': '福建', '江西省': '江西', '山东省': '山东', '河南省': '河南',
+      '湖北省': '湖北', '湖南省': '湖南', '广东省': '广东', '海南省': '海南',
+      '四川省': '四川', '贵州省': '贵州', '云南省': '云南', '陕西省': '陕西',
+      '甘肃省': '甘肃', '青海省': '青海', '台湾省': '台湾',
+      '内蒙古自治区': '内蒙古', '广西壮族自治区': '广西', '西藏自治区': '西藏',
+      '宁夏回族自治区': '宁夏', '新疆维吾尔自治区': '新疆',
+      '香港特别行政区': '香港', '澳门特别行政区': '澳门',
+      '北京': '北京', '天津': '天津', '上海': '上海', '重庆': '重庆',
+      '河北': '河北', '山西': '山西', '辽宁': '辽宁', '吉林': '吉林',
+      '黑龙江': '黑龙江', '江苏': '江苏', '浙江': '浙江', '安徽': '安徽',
+      '福建': '福建', '江西': '江西', '山东': '山东', '河南': '河南',
+      '湖北': '湖北', '湖南': '湖南', '广东': '广东', '海南': '海南',
+      '四川': '四川', '贵州': '贵州', '云南': '云南', '陕西': '陕西',
+      '甘肃': '甘肃', '青海': '青海', '台湾': '台湾',
+      '内蒙古': '内蒙古', '广西': '广西', '西藏': '西藏',
+      '宁夏': '宁夏', '新疆': '新疆', '香港': '香港', '澳门': '澳门'
+    };
+
+    const provinceCodeMap = {
+      '北京市': 110000, '天津市': 120000, '河北省': 130000, '山西省': 140000, '内蒙古自治区': 150000,
+      '辽宁省': 210000, '吉林省': 220000, '黑龙江省': 230000, '上海市': 310000, '江苏省': 320000,
+      '浙江省': 330000, '安徽省': 340000, '福建省': 350000, '江西省': 360000, '山东省': 370000,
+      '河南省': 410000, '湖北省': 420000, '湖南省': 430000, '广东省': 440000, '广西壮族自治区': 450000,
+      '海南省': 460000, '重庆市': 500000, '四川省': 510000, '贵州省': 520000, '云南省': 530000,
+      '西藏自治区': 540000, '陕西省': 610000, '甘肃省': 620000, '青海省': 630000, '宁夏回族自治区': 640000,
+      '新疆维吾尔自治区': 650000, '台湾省': 710000, '香港特别行政区': 810000, '澳门特别行政区': 820000
+    };
+
+    const superCityMap = {
+      '长沙': '湖南省', '株洲': '湖南省', '湘潭': '湖南省', '衡阳': '湖南省', '岳阳': '湖南省', '常德': '湖南省', '邵阳': '湖南省', '益阳': '湖南省', '郴州': '湖南省', '永州': '湖南省', '怀化': '湖南省', '娄底': '湖南省', '张家界': '湖南省',
+      '南京': '江苏省', '苏州': '江苏省', '无锡': '江苏省', '常州': '江苏省', '南通': '江苏省', '徐州': '江苏省', '扬州': '江苏省', '泰州': '江苏省',
+      '杭州': '浙江省', '宁波': '浙江省', '温州': '浙江省', '嘉兴': '浙江省', '绍兴': '浙江省', '金华': '浙江省', '台州': '浙江省',
+      '广州': '广东省', '深圳': '广东省', '珠海': '广东省', '东莞': '广东省', '佛山': '广东省', '中山': '广东省', '惠州': '广东省',
+      '成都': '四川省', '绵阳': '四川省', '德阳': '四川省', '宜宾': '四川省', '南充': '四川省', '泸州': '四川省',
+      '武汉': '湖北省', '宜昌': '湖北省', '襄阳': '湖北省', '荆州': '湖北省', '黄石': '湖北省',
+      '郑州': '河南省', '洛阳': '河南省', '开封': '河南省', '新乡': '河南省', '南阳': '河南省',
+      '济南': '山东省', '青岛': '山东省', '烟台': '山东省', '潍坊': '山东省', '临沂': '山东省',
+      '西安': '陕西省', '咸阳': '陕西省', '宝鸡': '陕西省', '渭南': '陕西省',
+      '福州': '福建省', '厦门': '福建省', '泉州': '福建省', '漳州': '福建省',
+      '合肥': '安徽省', '芜湖': '安徽省', '蚌埠': '安徽省', '安庆': '安徽省',
+      '南昌': '江西省', '赣州': '江西省', '九江': '江西省', '上饶': '江西省',
+      '昆明': '云南省', '大理': '云南省', '丽江': '云南省', '曲靖': '云南省',
+      '贵阳': '贵州省', '遵义': '贵州省', '六盘水': '贵州省',
+      '南宁': '广西壮族自治区', '桂林': '广西壮族自治区', '柳州': '广西壮族自治区',
+      '沈阳': '辽宁省', '大连': '辽宁省', '鞍山': '辽宁省',
+      '长春': '吉林省', '吉林': '吉林省',
+      '哈尔滨': '黑龙江省', '大庆': '黑龙江省',
+      '石家庄': '河北省', '唐山': '河北省', '保定': '河北省',
+      '太原': '山西省', '大同': '山西省',
+      '呼和浩特': '内蒙古自治区', '包头': '内蒙古自治区',
+      '兰州': '甘肃省', '天水': '甘肃省',
+      '西宁': '青海省',
+      '银川': '宁夏回族自治区',
+      '乌鲁木齐': '新疆维吾尔自治区',
+      '拉萨': '西藏自治区',
+      '海口': '海南省', '三亚': '海南省',
+      '台北': '台湾省', '高雄': '台湾省'
+    };
+
+    function formatDownload(text) {
+      if (!text) return '无';
+      const lowerText = text.toLowerCase();
+      if (lowerText.startsWith('http://') || lowerText.startsWith('https://')) {
+        return '<a class="my-link" href="' + text + '" target="_blank">点击下载</a>';
+      } else {
+        return '<span style="color:#333; font-weight:bold;">' + text + '</span>';
+      }
+    }
+
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel) {
+      let html = '<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【' + rawProvince + '】</div>';
+      html += '<div>作者：' + author + '</div>';
+      html += '<div>下载方式：</div>';
+      
+      if (freeLink || freeLevel) {
+        html += '<div style="margin-left:10px;">免费版' + (freeLevel ? '（' + freeLevel + '）' : '') + '：' + formatDownload(freeLink) + '</div>';
+      }
+      if (paidLink || paidLevel) {
+        html += '<div style="margin-left:10px;">付费版' + (paidLevel ? '（' + paidLevel + '）' : '') + '：' + formatDownload(paidLink) + '</div>';
+      }
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+
+    async function renderMap(mapName, mapId, isProvince = false) {
+      myChart.showLoading();
+      try {
+        const url = mapId 
+          ? 'https://geo.datav.aliyun.com/areas_v3/bound/' + mapId + '_full.json'
+          : 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
+        
+        const res = await fetch(url);
+        const geoJson = await res.json();
+
+        echarts.registerMap(mapName, geoJson);
+        
+        const features = geoJson.features.map(f => f.properties.name);
+        const mapData = [];
+        
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
+        const completedProvincesShort = allParsedData
+          .map(item => provinceShortMap[item.rawProvince])
+          .filter(shortName => shortName !== undefined);
+
+        features.forEach(featureName => {
+          const featureShort = provinceShortMap[featureName] || featureName.replace(/(省|市|自治区|特别行政区)/g, '');
+
+          if (!isProvince) {
+            if (completedProvincesShort.includes(featureShort)) {
+              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+              const matchItem = allParsedData.find(item => provinceShortMap[item.rawProvince] === featureShort);
+              if (matchItem) provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel);
+            } else {
+              const hasCityCompleted = allParsedData.some(item => {
+                if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
+                
+                const cleanName = item.rawProvince.replace(/市$/, '');
+                const prov = superCityMap[cleanName];
+                if (prov) {
+                  const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
+                  return provShort === featureShort;
+                }
+                return false;
+              });
+
+              if (hasCityCompleted) {
+                mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(255, 190, 0, 0.6)' } });
+              }
+            }
+          } 
+          else {
+            const featureShortCity = featureName.replace(/市$/, '');
+            const matchItem = allParsedData.find(item => item.rawProvince.replace(/市$/, '') === featureShortCity);
+            if (matchItem) {
+              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+              provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel);
+            }
+          }
+        });
+
+        myChart.hideLoading();
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: mapName,
+            roam: true,
+            zoom: isProvince ? 1.1 : 1.5,
+            center: isProvince ? undefined : [104, 36],
+            label: { show: true, fontSize: 10, color: '#333' },
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false, 
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+
+        backBtn.style.display = isProvince ? 'block' : 'none';
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+      }
+    }
+
+    async function init() {
+      try {
+        // ★ 核心修改：尝试读取 ./done.json 或 ./cn/done.json
+        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
+        if (!doneRes.ok) {
+          doneRes = await fetch('./cn/done.json?t=' + new Date().getTime());
+        }
+        
+        if (doneRes.ok) {
+          let text = await doneRes.text();
+          text = text.replace(/[\[\]"'\r\n]/g, '').trim(); 
+          const lines = text.split(',');
+
+          lines.forEach(line => {
+            let rawLine = line.trim();
+            if (!rawLine) return;
+
+            rawLine = rawLine.replace(/；/g, ';'); 
+            const parts = rawLine.split(';'); 
+            
+            const rawProvince = parts[0].trim();
+            const itemData = {
+              rawProvince: rawProvince,
+              author: parts[1] || '未知',
+              freeLink: parts[2] || '',
+              freeLevel: parts[3] || '',
+              paidLink: parts[4] || '',
+              paidLevel: parts[5] || ''
+            };
+
+            const cleanName = rawProvince.replace(/市$/, '');
+            if (superCityMap[cleanName]) {
+              itemData.provinceName = superCityMap[cleanName];
+            } else {
+              itemData.provinceName = rawProvince;
+            }
+
+            allParsedData.push(itemData);
+          });
+        } else {
+          console.warn("未找到 done.json，请检查路径。");
+        }
+      } catch (e) {
+        console.error("读取 done.json 失败", e);
+      }
+
+      renderMap('china', null, false);
+    }
+
+    init();
+
+    myChart.on('click', function (params) {
+      if (backBtn.style.display === 'none') {
+        const provinceName = params.name;
+        let mapId = null;
+        for (let key in provinceCodeMap) {
+          if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
+             mapId = provinceCodeMap[key];
+             break;
+          }
+        }
+        if (mapId) {
+          renderMap(params.name, mapId, true);
+        }
+      }
+    });
+
+    backBtn.addEventListener('click', () => {
+      renderMap('china', null, false);
+    });
+
+    let isOverBox = false;
+    let hideTimer = null;
+    let currentHoverName = null;
+
+    myChart.on('mouseover', function (params) {
+      if (!provinceDataMap[params.name]) return;
+      if (isOverBox || currentHoverName === params.name) return;
+      
+      clearTimeout(hideTimer);
+      currentHoverName = params.name;
+      tooltipEl.innerHTML = provinceDataMap[params.name];
+      tooltipEl.style.display = 'block';
+
+      if (params.event && params.event.event) {
+        const e = params.event.event;
+        let x = e.clientX + 20;
+        let y = e.clientY - 20;
+
+        if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+        if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+        if (y < 10) y = 10;
+
+        tooltipEl.style.left = x + 'px';
+        tooltipEl.style.top = y + 'px';
+      }
+    });
+
+    myChart.on('mouseout', function () {
+      hideTimer = setTimeout(() => {
+        if (!isOverBox) {
+          tooltipEl.style.display = 'none';
+          currentHoverName = null;
+        }
+      }, 300);
+    });
+
+    tooltipEl.addEventListener('mouseenter', () => {
+      isOverBox = true;
+      clearTimeout(hideTimer);
+    });
+
+    tooltipEl.addEventListener('mouseleave', () => {
+      isOverBox = false;
+      tooltipEl.style.display = 'none';
+      currentHoverName = null;
+    });
+
+    window.addEventListener('resize', () => myChart.resize());
+  </script>
+</body>
+</html>
