@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HorizonSimLabs - 飞机音效</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #0f172a; color: #fff; font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            padding: 30px 20px;
+        }
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 1200px; margin: 0 auto 30px auto;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 20px;
+        }
+        h2 { font-size: 2rem; color: #e2e8f0; }
+        .back-link {
+            color: #94a3b8; text-decoration: none; font-size: 0.9rem;
+            padding: 8px 16px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; transition: 0.3s;
+        }
+        .back-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+        .filter-bar {
+            max-width: 1200px; margin: 0 auto 30px auto;
+            display: flex; gap: 20px; flex-wrap: wrap;
+            background: rgba(30, 41, 59, 0.6); padding: 15px 20px; border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
+        .filter-group label { font-size: 0.85rem; color: #94a3b8; font-weight: bold; }
+        .filter-group select {
+            background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px; padding: 10px; font-size: 0.95rem; outline: none; cursor: pointer; transition: 0.3s;
+        }
+        .filter-group select:focus { border-color: #f59e0b; }
+
+        .skin-grid {
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;
+        }
+        .skin-card {
+            background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column;
+        }
+        .skin-card:hover { transform: translateY(-5px); border-color: #f59e0b; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.2); }
+        .card-image { width: 100%; height: 160px; object-fit: cover; background: #0f172a; }
+        .card-content { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #fff; margin-bottom: 10px; line-height: 1.4; }
+        .card-info { font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .card-info span { color: #cbd5e1; font-weight: 500; }
+        .download-btn {
+            display: block; text-align: center; padding: 10px;
+            background: #f59e0b; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background 0.3s;
+        }
+        .download-btn:hover { background: #d97706; }
+        .empty-state { grid-column: 1 / -1; text-align: center; padding: 50px; color: #94a3b8; font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>飞机音效库</h2>
+        <a href="../plane.html" class="back-link">← 返回飞机分类</a>
+    </div>
+
+    <!-- 筛选栏：增加了机型 -->
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>机型 (Aircraft)</label>
+            <select id="filter-aircraft"><option value="all">全部机型</option></select>
+        </div>
+        <div class="filter-group">
+            <label>分类 (Category)</label>
+            <select id="filter-category"><option value="all">全部分类</option></select>
+        </div>
+        <div class="filter-group">
+            <label>作者 (Author)</label>
+            <select id="filter-author"><option value="all">全部作者</option></select>
+        </div>
+    </div>
+
+    <div class="skin-grid" id="skin-list">
+        <div class="empty-state">正在加载音效数据...</div>
+    </div>
+
+    <script>
+        let allSkins = [];
+        async function init() {
+            try {
+                const res = await fetch('./sound.json?t=' + new Date().getTime());
+                if (!res.ok) throw new Error('找不到 sound.json');
+                allSkins = await res.json();
+                if (!Array.isArray(allSkins)) throw new Error('必须是数组');
+                
+                populateFilters(allSkins);
+                renderCards(allSkins);
+                bindFilterEvents();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('skin-list').innerHTML = `<div class="empty-state" style="color:#f87171;">加载失败！请确保存在 sound.json 且格式正确。</div>`;
+            }
+        }
+
+        // 自动提取选项并填充下拉框
+        function populateFilters(data) {
+            const aircrafts = [...new Set(data.map(item => item.aircraft))].filter(Boolean);
+            const categories = [...new Set(data.map(item => item.category))].filter(Boolean);
+            const authors = [...new Set(data.map(item => item.author))].filter(Boolean);
+            
+            const selAircraft = document.getElementById('filter-aircraft');
+            const selCategory = document.getElementById('filter-category');
+            const selAuthor = document.getElementById('filter-author');
+            
+            aircrafts.forEach(val => selAircraft.innerHTML += `<option value="${val}">${val}</option>`);
+            categories.forEach(val => selCategory.innerHTML += `<option value="${val}">${val}</option>`);
+            authors.forEach(val => selAuthor.innerHTML += `<option value="${val}">${val}</option>`);
+        }
+
+        function renderCards(data) {
+            const listEl = document.getElementById('skin-list');
+            if (data.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">没有找到符合条件的音效。</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(item => {
+                html += `
+                    <div class="skin-card">
+                        ${item.image ? `<img src="${item.image}" class="card-image" alt="${item.name}">` : `<div class="card-image"></div>`}
+                        <div class="card-content">
+                            <div class="card-title">${item.name || '未命名音效'}</div>
+                            <div class="card-info">
+                                <div>机型：<span>${item.aircraft || '通用'}</span></div>
+                                <div>分类：<span>${item.category || '未知'}</span></div>
+                                <div>作者：<span>${item.author || '未知'}</span></div>
+                            </div>
+                            ${item.link ? `<a href="${item.link}" target="_blank" class="download-btn">点击下载</a>` : `<a href="javascript:void(0)" class="download-btn" style="background:#475569;cursor:not-allowed;">暂无下载链接</a>`}
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        // 筛选逻辑：机型 + 分类 + 作者
+        function bindFilterEvents() {
+            const selAircraft = document.getElementById('filter-aircraft');
+            const selCategory = document.getElementById('filter-category');
+            const selAuthor = document.getElementById('filter-author');
+            
+            function applyFilters() {
+                const a = selAircraft.value;
+                const c = selCategory.value;
+                const u = selAuthor.value;
+                
+                const filtered = allSkins.filter(item => {
+                    const matchAircraft = (a === 'all' || item.aircraft === a);
+                    const matchCategory = (c === 'all' || item.category === c);
+                    const matchAuthor = (u === 'all' || item.author === u);
+                    return matchAircraft && matchCategory && matchAuthor;
+                });
+                renderCards(filtered);
+            }
+            
+            selAircraft.addEventListener('change', applyFilters);
+            selCategory.addEventListener('change', applyFilters);
+            selAuthor.addEventListener('change', applyFilters);
+        }
+        init();
+    </script>
+</body>
+</html>
