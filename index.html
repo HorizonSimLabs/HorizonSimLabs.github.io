@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HorizonSimLabs - 主页</title>
-    <link rel="icon" href="HorizonSimLabs.png" type="image/png">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -54,13 +53,135 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
         }
+
+        /* ★ 公告栏样式 */
+        .notice-board {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 350px;
+            max-height: 60vh; /* 最高高度，超长可滚动 */
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+            overflow-y: auto;
+        }
+
+        .notice-board::-webkit-scrollbar { width: 6px; }
+        .notice-board::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+        .notice-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            padding-bottom: 10px;
+        }
+        .notice-title::before { content: '📢'; font-size: 1.2rem; }
+
+        /* 单条公告样式（时间轴卡片） */
+        .notice-item {
+            margin-bottom: 15px;
+            padding-left: 12px;
+            border-left: 3px solid #3b82f6;
+        }
+        .notice-item:last-child { margin-bottom: 0; }
+        
+        .notice-item-date {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+        .notice-item-title {
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #e2e8f0;
+            margin-bottom: 4px;
+        }
+        .notice-item-content {
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: #cbd5e1;
+        }
+
+        /* 手机端适配：移到底部 */
+        @media (max-width: 768px) {
+            .notice-board {
+                top: auto;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                width: auto;
+                max-height: 200px;
+                padding: 15px;
+            }
+            h1 { font-size: 2.5rem; }
+        }
     </style>
 </head>
 <body>
+    
+    <!-- 公告栏容器 -->
+    <div class="notice-board">
+        <div class="notice-title">最新公告</div>
+        <div id="notice-list">
+            <div class="notice-item-content" style="color:#94a3b8;">正在加载公告...</div>
+        </div>
+    </div>
+
     <h1>HorizonSimLabs 欢迎您</h1>
     <div class="btn-group">
         <a href="./scenery.html" class="btn">地景</a>
-        <a href="./plane.html" class="btn">飞机</a>
+        <a href="./skin.html" class="btn">涂装</a>
     </div>
+
+    <script>
+        // ★ 核心逻辑：读取并渲染公告
+        async function loadNotices() {
+            const listEl = document.getElementById('notice-list');
+            try {
+                // 加时间戳防止浏览器缓存
+                const res = await fetch('./notice.json?t=' + new Date().getTime());
+                if (!res.ok) throw new Error('找不到 notice.json 文件');
+                
+                const data = await res.json();
+                if (!Array.isArray(data) || data.length === 0) {
+                    listEl.innerHTML = '<div class="notice-item-content">暂无最新公告。</div>';
+                    return;
+                }
+
+                // 遍历生成 HTML
+                let html = '';
+                data.forEach(item => {
+                    html += `
+                        <div class="notice-item">
+                            <div class="notice-item-date">${item.date || '未知日期'}</div>
+                            <div class="notice-item-title">${item.title || '无标题'}</div>
+                            <div class="notice-item-content">${item.content || '无内容'}</div>
+                        </div>
+                    `;
+                });
+                listEl.innerHTML = html;
+
+            } catch (e) {
+                console.error("读取公告失败，请检查 notice.json 格式", e);
+                listEl.innerHTML = '<div class="notice-item-content" style="color:#f87171;">公告加载失败，请检查 notice.json 格式。</div>';
+            }
+        }
+
+        // 页面加载时执行
+        loadNotices();
+    </script>
 </body>
 </html>
