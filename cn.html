@@ -2,50 +2,66 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <!-- ★ 核心修复：禁止发送 Referrer，绕过阿里云防盗链 403 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <!-- 核心修复：禁止发送 Referrer，绕过阿里云防盗链 403 -->
   <meta name="referrer" content="no-referrer" />
   <title>中国地景</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
   <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; }
+    html, body { 
+      margin: 0; padding: 0; width: 100%; height: 100%; 
+      background: #f5f7fa; overflow: hidden; 
+      font-family: system-ui, -apple-system, sans-serif;
+    }
     #map { width: 100%; height: 100%; }
     
+    /* 弹窗样式（兼容触摸端和鼠标端） */
     #my-tooltip {
       position: fixed;
       background: #fff;
       border: 2px solid #1890ff;
-      border-radius: 6px;
-      padding: 12px;
-      font: 14px/1.8 system-ui, sans-serif;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font: 14px/1.6 system-ui, sans-serif;
       color: #333;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15);
       display: none;
       pointer-events: auto; 
       z-index: 99999;
       white-space: nowrap;
+      transition: opacity 0.2s;
     }
     
     .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
 
+    /* 返回按钮（响应式尺寸） */
     #back-btn {
       position: fixed;
-      top: 20px;
-      left: 20px;
-      padding: 10px 20px;
+      top: 15px;
+      left: 15px;
+      padding: 8px 16px;
       background: #1890ff;
       color: white;
       border: none;
       border-radius: 6px;
       cursor: pointer;
-      font: 14px system-ui, sans-serif;
+      font-size: 14px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.2);
       display: none;
       z-index: 9999;
     }
     #back-btn:hover { background: #40a9ff; }
+
+    /* 针对手机屏幕调整弹窗大小 */
+    @media (max-width: 768px) {
+      #my-tooltip {
+        font-size: 13px;
+        padding: 10px 14px;
+        border-radius: 6px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -56,6 +72,9 @@
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const backBtn = document.getElementById('back-btn');
+    
+    // 判断是否为移动端/触摸设备
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     
     const provinceDataMap = {};
     let allParsedData = []; 
@@ -213,9 +232,9 @@
             type: 'map',
             map: mapName,
             roam: true,
-            zoom: isProvince ? 1.1 : 1.5,
+            zoom: isProvince ? 1.1 : (isMobile ? 1.2 : 1.5), // 手机端稍微缩小一点
             center: isProvince ? undefined : [104, 36],
-            label: { show: true, fontSize: 10, color: '#333' },
+            label: { show: !isMobile, fontSize: 10, color: '#333' }, // 手机端隐藏小字防止杂乱
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
             selectedMode: false, 
             emphasis: { itemStyle: { areaColor: 'inherit' } },
@@ -233,7 +252,6 @@
 
     async function init() {
       try {
-        // ★ 双保险路径读取
         let doneRes = await fetch('./cn/done.json?t=' + new Date().getTime());
         if (!doneRes.ok) {
           doneRes = await fetch('./done.json?t=' + new Date().getTime());
@@ -275,78 +293,142 @@
         console.error("读取 done.json 失败，请确认文件是否已上传到正确位置", e);
       }
 
-      // 开始渲染地图
       renderMap('china', null, false);
     }
 
     init();
 
+    // ==========================================
+    // ★ 交互事件处理（鼠标端 vs 触摸端）
+    // ==========================================
+    
+    let lastClickTime = 0;
+    let lastClickName = '';
+
     myChart.on('click', function (params) {
-      if (backBtn.style.display === 'none') {
-        const provinceName = params.name;
-        let mapId = null;
-        for (let key in provinceCodeMap) {
-          if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
-             mapId = provinceCodeMap[key];
-             break;
+      const now = new Date().getTime();
+      const provinceName = params.name;
+
+      if (isMobile) {
+        // --- 手机端逻辑 ---
+        // 1. 判断是不是双击 (300ms内点击同一个省份)
+        if (now - lastClickTime < 300 && lastClickName === provinceName) {
+          // 触发双击：下钻
+          if (backBtn.style.display === 'none') {
+             let mapId = null;
+             for (let key in provinceCodeMap) {
+               if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
+                  mapId = provinceCodeMap[key];
+                  break;
+               }
+             }
+             if (mapId) {
+               tooltipEl.style.display = 'none'; // 下钻时关掉提示框
+               renderMap(params.name, mapId, true);
+             }
+          }
+        } else {
+          // 触发单击：显示信息框
+          if (provinceDataMap[provinceName]) {
+            tooltipEl.innerHTML = provinceDataMap[provinceName];
+            tooltipEl.style.display = 'block';
+            
+            // 在手机端，把弹窗固定在屏幕中下方，防遮挡
+            tooltipEl.style.left = '50%';
+            tooltipEl.style.top = 'auto';
+            tooltipEl.style.bottom = '50px';
+            tooltipEl.style.transform = 'translateX(-50%)';
+          } else {
+            // 如果点的是没数据的省份，关闭弹窗
+            tooltipEl.style.display = 'none';
           }
         }
-        if (mapId) {
-          renderMap(params.name, mapId, true);
+        lastClickTime = now;
+        lastClickName = provinceName;
+
+      } else {
+        // --- 电脑端逻辑 ---
+        // 单击直接下钻
+        if (backBtn.style.display === 'none') {
+          let mapId = null;
+          for (let key in provinceCodeMap) {
+            if (provinceShortMap[key] === provinceName || provinceShortMap[key] === provinceShortMap[provinceName] || key === provinceName) {
+               mapId = provinceCodeMap[key];
+               break;
+            }
+          }
+          if (mapId) {
+            renderMap(params.name, mapId, true);
+          }
         }
+      }
+    });
+
+    // 点击地图空白处关闭手机端弹窗
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) {
+        tooltipEl.style.display = 'none';
       }
     });
 
     backBtn.addEventListener('click', () => {
+      tooltipEl.style.display = 'none';
       renderMap('china', null, false);
     });
 
-    let isOverBox = false;
-    let hideTimer = null;
-    let currentHoverName = null;
+    // --- 电脑端鼠标悬浮逻辑 ---
+    if (!isMobile) {
+      let isOverBox = false;
+      let hideTimer = null;
+      let currentHoverName = null;
 
-    myChart.on('mouseover', function (params) {
-      if (!provinceDataMap[params.name]) return;
-      if (isOverBox || currentHoverName === params.name) return;
-      
-      clearTimeout(hideTimer);
-      currentHoverName = params.name;
-      tooltipEl.innerHTML = provinceDataMap[params.name];
-      tooltipEl.style.display = 'block';
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name]) return;
+        if (isOverBox || currentHoverName === params.name) return;
+        
+        clearTimeout(hideTimer);
+        currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        
+        // 重置手机端可能留下的样式
+        tooltipEl.style.transform = 'none';
+        tooltipEl.style.bottom = 'auto';
+        tooltipEl.style.display = 'block';
 
-      if (params.event && params.event.event) {
-        const e = params.event.event;
-        let x = e.clientX + 20;
-        let y = e.clientY - 20;
+        if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20;
+          let y = e.clientY - 20;
 
-        if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
-        if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
-        if (y < 10) y = 10;
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
 
-        tooltipEl.style.left = x + 'px';
-        tooltipEl.style.top = y + 'px';
-      }
-    });
-
-    myChart.on('mouseout', function () {
-      hideTimer = setTimeout(() => {
-        if (!isOverBox) {
-          tooltipEl.style.display = 'none';
-          currentHoverName = null;
+          tooltipEl.style.left = x + 'px';
+          tooltipEl.style.top = y + 'px';
         }
-      }, 300);
-    });
+      });
 
-    tooltipEl.addEventListener('mouseenter', () => {
-      isOverBox = true;
-      clearTimeout(hideTimer);
-    });
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => {
+          if (!isOverBox) {
+            tooltipEl.style.display = 'none';
+            currentHoverName = null;
+          }
+        }, 300);
+      });
 
-    tooltipEl.addEventListener('mouseleave', () => {
-      isOverBox = false;
-      tooltipEl.style.display = 'none';
-      currentHoverName = null;
-    });
+      tooltipEl.addEventListener('mouseenter', () => {
+        isOverBox = true;
+        clearTimeout(hideTimer);
+      });
+
+      tooltipEl.addEventListener('mouseleave', () => {
+        isOverBox = false;
+        tooltipEl.style.display = 'none';
+        currentHoverName = null;
+      });
+    }
 
     window.addEventListener('resize', () => myChart.resize());
   </script>
