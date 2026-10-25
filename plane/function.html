@@ -51,12 +51,45 @@
         .card-title { font-size: 1.1rem; font-weight: bold; color: #fff; margin-bottom: 10px; line-height: 1.4; }
         .card-info { font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
         .card-info span { color: #cbd5e1; font-weight: 500; }
+        
+        /* 按钮组 */
+        .btn-group { display: flex; gap: 10px; margin-top: auto; }
         .download-btn {
-            display: block; text-align: center; padding: 10px;
+            flex: 1; text-align: center; padding: 10px;
             background: #10b981; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background 0.3s;
         }
         .download-btn:hover { background: #059669; }
+        .desc-btn {
+            flex: 1; text-align: center; padding: 10px; border: 1px solid #3b82f6; background: transparent;
+            color: #3b82f6; text-decoration: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.3s;
+        }
+        .desc-btn:hover { background: #3b82f6; color: #fff; }
+
         .empty-state { grid-column: 1 / -1; text-align: center; padding: 50px; color: #94a3b8; font-size: 1.1rem; }
+
+        /* ★ 详情弹窗样式 */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(5px);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
+        }
+        .modal-content {
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px; width: 90%; max-width: 500px; padding: 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5); position: relative;
+            animation: modalIn 0.3s ease;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-title { font-size: 1.3rem; font-weight: bold; color: #10b981; margin-bottom: 15px; padding-right: 20px; }
+        .modal-desc { font-size: 0.95rem; line-height: 1.6; color: #cbd5e1; white-space: pre-wrap; max-height: 50vh; overflow-y: auto; }
+        .close-btn {
+            position: absolute; top: 15px; right: 20px;
+            background: none; border: none; color: #94a3b8; font-size: 1.5rem; cursor: pointer; transition: 0.3s;
+        }
+        .close-btn:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -80,8 +113,42 @@
         <div class="empty-state">正在加载功能数据...</div>
     </div>
 
+    <!-- 弹窗结构 -->
+    <div class="modal-overlay" id="desc-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeDesc()">×</button>
+            <div class="modal-title" id="modal-title">功能介绍</div>
+            <div class="modal-desc" id="modal-desc"></div>
+        </div>
+    </div>
+
     <script>
         let allSkins = [];
+        const modalOverlay = document.getElementById('desc-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+
+        // 关闭弹窗函数
+        function closeDesc() {
+            modalOverlay.style.display = 'none';
+        }
+
+        // 点击遮罩层关闭弹窗
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeDesc();
+        });
+
+        // 打开弹窗函数
+        function openDesc(name, desc) {
+            if (!desc || desc.trim() === '') {
+                alert('该插件暂无详细介绍。');
+                return;
+            }
+            modalTitle.innerText = name;
+            modalDesc.innerText = desc; // 使用 innerText 防止 XSS，同时保留换行
+            modalOverlay.style.display = 'flex';
+        }
+
         async function init() {
             try {
                 const res = await fetch('./function.json?t=' + new Date().getTime());
@@ -115,6 +182,12 @@
             }
             let html = '';
             data.forEach(item => {
+                // 判断是否有介绍，没有就隐藏按钮
+                const hasDesc = item.description && item.description.trim() !== '';
+                const descBtnHtml = hasDesc 
+                    ? `<button class="desc-btn" onclick="openDesc('${item.name.replace(/'/g, "\\'")}', '${item.description.replace(/'/g, "\\'").replace(/\n/g, "\\n")}')">查看介绍</button>` 
+                    : '';
+
                 html += `
                     <div class="skin-card">
                         ${item.image ? `<img src="${item.image}" class="card-image" alt="${item.name}">` : `<div class="card-image"></div>`}
@@ -124,7 +197,10 @@
                                 <div>机型：<span>${item.aircraft || '未知'}</span></div>
                                 <div>作者：<span>${item.author || '未知'}</span></div>
                             </div>
-                            ${item.link ? `<a href="${item.link}" target="_blank" class="download-btn">点击下载</a>` : `<a href="javascript:void(0)" class="download-btn" style="background:#475569;cursor:not-allowed;">暂无下载链接</a>`}
+                            <div class="btn-group">
+                                ${item.link ? `<a href="${item.link}" target="_blank" class="download-btn">点击下载</a>` : `<a href="javascript:void(0)" class="download-btn" style="background:#475569;cursor:not-allowed;">暂无链接</a>`}
+                                ${descBtnHtml}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -146,6 +222,7 @@
             selAircraft.addEventListener('change', applyFilters);
             selAuthor.addEventListener('change', applyFilters);
         }
+
         init();
     </script>
 </body>
