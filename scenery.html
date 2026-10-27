@@ -1,60 +1,189 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HorizonSimLabs - 地景</title>
-    <link rel="icon" href="HorizonSimLabs.png" type="image/png">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            background: #0f172a;
-            color: #fff;
-            font-family: 'Segoe UI', system-ui, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-        }
-        h2 { font-size: 2.5rem; margin-bottom: 2rem; color: #e2e8f0; }
-        .btn {
-            display: inline-block;
-            padding: 15px 40px;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: #fff;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 12px;
-            cursor: pointer;
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-        .btn:hover {
-            background: #10b981;
-            border-color: #10b981;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
-        }
-        .back-link {
-            margin-top: 3rem;
-            color: #94a3b8;
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: 0.3s;
-        }
-        .back-link:hover { color: #fff; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>全球地景 - HorizonSimLabs</title>
+  <link rel="icon" href="HorizonSimLabs.png" type="image/png">
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
+    #map { width: 100%; height: 100%; }
+    
+    .ui-btn {
+      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
+      backdrop-filter: blur(10px); transition: 0.3s;
+    }
+    .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
+    #back-btn { left: 15px; }
+    #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
+    #lang-btn:hover { background: #059669; }
+  </style>
 </head>
 <body>
-    <h2>选择地区</h2>
-    <!-- 注意这里：跳转到同目录下的 cn.html -->
-    <a href="./cn.html" class="btn">中国地景</a>
+  <a href="./index.html" id="back-btn" class="ui-btn">← 返回主页</a>
+  <button id="lang-btn" class="ui-btn">Switch to English</button>
+  
+  <div id="map"></div>
+
+  <script>
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let currentLang = 'zh';
     
-    <!-- 返回主页 -->
-    <a href="./index.html" class="back-link">← 返回主页</a>
+    const i18n = {
+      zh: { back: "← 返回主页", clickToEnter: "点击进入地景", langBtn: "Switch to English" },
+      en: { back: "← Back to Home", clickToEnter: "Click to explore scenery", langBtn: "切换到中文" }
+    };
+
+    // ★ 终极全量字典：包含了 South Korea / Korea
+    const countryTranslation = {
+      "China": "中国", "United States": "美国", "Japan": "日本", "United Kingdom": "英国",
+      "France": "法国", "Germany": "德国", "Australia": "澳大利亚", "Canada": "加拿大",
+      "Russia": "俄罗斯", "Brazil": "巴西", 
+      "South Korea": "韩国", "Korea": "韩国", "Republic of Korea": "韩国", 
+      "North Korea": "朝鲜", "Dem. Rep. Korea": "朝鲜",
+      "Singapore": "新加坡", "Thailand": "泰国", "Italy": "意大利", "Spain": "西班牙",
+      "Malaysia": "马来西亚", "Indonesia": "印度尼西亚", "Philippines": "菲律宾", "Vietnam": "越南",
+      "New Zealand": "新西兰", "Switzerland": "瑞士", "Netherlands": "荷兰", "Sweden": "瑞典",
+      "Norway": "挪威", "Finland": "芬兰", "Denmark": "丹麦", "Poland": "波兰", "Turkey": "土耳其",
+      "United Arab Emirates": "阿联酋", "South Africa": "南非", "Argentina": "阿根廷", "Mexico": "墨西哥",
+      "India": "印度", "Pakistan": "巴基斯坦", "Bangladesh": "孟加拉国", "Sri Lanka": "斯里兰卡",
+      "Nepal": "尼泊尔", "Bhutan": "不丹", "Mongolia": "蒙古", "Kazakhstan": "哈萨克斯坦",
+      "Uzbekistan": "乌兹别克斯坦", "Turkmenistan": "土库曼斯坦", "Kyrgyzstan": "吉尔吉斯斯坦",
+      "Tajikistan": "塔吉克斯坦", "Afghanistan": "阿富汗", "Iran": "伊朗", "Iraq": "伊拉克",
+      "Saudi Arabia": "沙特阿拉伯", "Kuwait": "科威特", "Qatar": "卡塔尔", "Oman": "阿曼",
+      "Yemen": "也门", "Jordan": "约旦", "Israel": "以色列", "Lebanon": "黎巴嫩", "Syria": "叙利亚",
+      "Egypt": "埃及", "Libya": "利比亚", "Tunisia": "突尼斯", "Algeria": "阿尔及利亚",
+      "Morocco": "摩洛哥", "Sudan": "苏丹", "Ethiopia": "埃塞俄比亚", "Kenya": "肯尼亚",
+      "Tanzania": "坦桑尼亚", "Nigeria": "尼日利亚", "Ghana": "加纳", "Angola": "安哥拉",
+      "Zambia": "赞比亚", "Zimbabwe": "津巴布韦", "Mozambique": "莫桑比克", "Madagascar": "马达加斯加",
+      "Chile": "智利", "Peru": "秘鲁", "Colombia": "哥伦比亚", "Venezuela": "委内瑞拉",
+      "Ecuador": "厄瓜多尔", "Bolivia": "玻利维亚", "Paraguay": "巴拉圭", "Uruguay": "乌拉圭",
+      "Cuba": "古巴", "Haiti": "海地", "Dominican Republic": "多米尼加", "Guatemala": "危地马拉",
+      "Honduras": "洪都拉斯", "El Salvador": "萨尔瓦多", "Nicaragua": "尼加拉瓜", "Costa Rica": "哥斯达黎加",
+      "Panama": "巴拿马", "Portugal": "葡萄牙", "Greece": "希腊", "Ireland": "爱尔兰",
+      "Belgium": "比利时", "Austria": "奥地利", "Czechia": "捷克", "Hungary": "匈牙利",
+      "Romania": "罗马尼亚", "Bulgaria": "保加利亚", "Ukraine": "乌克兰", "Belarus": "白俄罗斯",
+      "Iceland": "冰岛", "Croatia": "克罗地亚", "Serbia": "塞尔维亚", "Slovakia": "斯洛伐克",
+      "Slovenia": "斯洛文尼亚", "Lithuania": "立陶宛", "Latvia": "拉脱维亚", "Estonia": "爱沙尼亚",
+      "Georgia": "格鲁吉亚", "Armenia": "亚美尼亚", "Azerbaijan": "阿塞拜疆", "Cyprus": "塞浦路斯",
+      "Malta": "马耳他", "Luxembourg": "卢森堡", "Papua New Guinea": "巴布亚新几内亚",
+      "Fiji": "斐济", "Solomon Islands": "所罗门群岛", "Vanuatu": "瓦努阿图", "Samoa": "萨摩亚",
+      "Tonga": "汤加", "Kiribati": "基里巴斯", "Tuvalu": "图瓦卢", "Palau": "帕劳",
+      "Marshall Islands": "马绍尔群岛", "Micronesia": "密克罗尼西亚", "Nauru": "瑙鲁",
+      "Brunei": "文莱", "Timor-Leste": "东帝汶", "Cambodia": "柬埔寨", "Laos": "老挝",
+      "Myanmar": "缅甸", "Maldives": "马尔代夫", "Bahrain": "巴林"
+    };
+
+    // 构建反向字典：中文 -> 英文名
+    const countryReverse = {};
+    for (let k in countryTranslation) { 
+      // 如果多个英文名对应同一个中文，优先使用较短的（比如优先用 Korea 而不是 South Korea）
+      const zhName = countryTranslation[k];
+      if (!countryReverse[zhName] || k.length < countryReverse[zhName].length) {
+        countryReverse[zhName] = k;
+      }
+    }
+
+    const validCountries = {}; 
+    const myChart = echarts.init(document.getElementById('map'));
+
+    function updateUI() {
+      const t = i18n[currentLang];
+      document.getElementById('back-btn').innerText = t.back;
+      document.getElementById('lang-btn').innerText = t.langBtn;
+    }
+
+    async function loadMap() {
+      myChart.showLoading();
+      const t = i18n[currentLang];
+      for (let k in validCountries) delete validCountries[k];
+
+      try {
+        let res = await fetch('./global.json?t=' + new Date().getTime());
+        if (res.ok) {
+          let text = await res.text();
+          text = text.replace(/[\[\]"'\r\n]/g, '').trim(); 
+          const lines = text.split(',');
+          lines.forEach(line => {
+            let rawLine = line.trim();
+            if (!rawLine) return;
+            const parts = rawLine.split(';'); 
+            const rawCountry = parts[0].trim();
+            const link = parts[1] ? parts[1].trim() : '';
+            
+            const engName = countryReverse[rawCountry] || rawCountry;
+            if (link) validCountries[engName] = link;
+          });
+        }
+      } catch (e) { console.error(e); }
+
+      try {
+        const worldRes = await fetch('https://fastly.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json');
+        const worldJson = await worldRes.json();
+        echarts.registerMap('world', worldJson);
+        
+        const features = worldJson.features.map(f => f.properties.name);
+        const mapData = [];
+        
+        features.forEach(featureName => {
+          // 如果这个国家在 validCountries 里（比如 "Korea" 或 "South Korea"），就变绿
+          if (validCountries[featureName]) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+          }
+        });
+
+        myChart.hideLoading();
+        myChart.setOption({
+          tooltip: { 
+            show: true, trigger: 'item',
+            formatter: function (params) {
+              if (validCountries[params.name]) {
+                const displayName = currentLang === 'zh' ? (countryTranslation[params.name] || params.name) : params.name;
+                return `<span style="font-weight:bold;">${displayName}</span><br/><span style="color:#1890ff;">${t.clickToEnter}</span>`;
+              }
+              return '';
+            }
+          },
+          series: [{
+            type: 'map', map: 'world', roam: true, zoom: 1.2,
+            label: { 
+              show: true, 
+              fontSize: isMobile ? 8 : 10, 
+              color: '#333',
+              formatter: function (params) {
+                if (currentLang === 'zh') {
+                  return countryTranslation[params.name] || params.name;
+                }
+                return params.name; 
+              }
+            }, 
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false, 
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+      } catch (e) { console.error(e); }
+    }
+
+    updateUI();
+    loadMap();
+
+    document.getElementById('lang-btn').addEventListener('click', () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI();
+      loadMap();
+    });
+
+    myChart.on('click', function (params) {
+      if (validCountries[params.name]) window.location.href = validCountries[params.name];
+    });
+
+    window.addEventListener('resize', () => myChart.resize());
+  </script>
 </body>
 </html>
