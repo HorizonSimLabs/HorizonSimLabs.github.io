@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="referrer" content="no-referrer" />
   <title>全球地景 - HorizonSimLabs</title>
-  <link rel="icon" href="HorizonSimLabs.png" type="image/png">
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
@@ -21,12 +21,47 @@
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
+
+    /* 悬浮国家列表菜单 */
+    #country-menu {
+      position: fixed; top: 70px; right: 15px;
+      background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 12px;
+      padding: 15px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3); min-width: 150px;
+      max-height: 70vh; overflow-y: auto;
+    }
+    #country-menu::-webkit-scrollbar { width: 4px; }
+    #country-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+    
+    .menu-title { color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+    
+    .country-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: rgba(255,255,255,0.05);
+      border-radius: 6px; color: #fff; text-decoration: none; font-size: 0.95rem;
+      transition: 0.2s; cursor: pointer;
+    }
+    .country-item:hover { background: #3b82f6; transform: translateX(-5px); }
+    .country-item::after { content: '→'; color: #94a3b8; }
+    .country-item:hover::after { color: #fff; }
+    
+    /* 手机端稍微调整一下菜单大小 */
+    @media (max-width: 768px) {
+      #country-menu { top: 70px; right: 10px; padding: 10px; min-width: 120px; }
+      .country-item { padding: 6px 10px; font-size: 0.85rem; }
+    }
   </style>
 </head>
 <body>
   <a href="./index.html" id="back-btn" class="ui-btn">← 返回主页</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   
+  <!-- 国家跳转菜单 -->
+  <div id="country-menu">
+    <div class="menu-title">已开放地景</div>
+  </div>
+
   <div id="map"></div>
 
   <script>
@@ -38,17 +73,15 @@
       en: { back: "← Back to Home", clickToEnter: "Click to explore scenery", langBtn: "切换到中文" }
     };
 
-    // ★ 终极全量字典：包含了 South Korea / Korea
     const countryTranslation = {
       "China": "中国", "United States": "美国", "Japan": "日本", "United Kingdom": "英国",
       "France": "法国", "Germany": "德国", "Australia": "澳大利亚", "Canada": "加拿大",
-      "Russia": "俄罗斯", "Brazil": "巴西", 
-      "South Korea": "韩国", "Korea": "韩国", "Republic of Korea": "韩国", 
-      "North Korea": "朝鲜", "Dem. Rep. Korea": "朝鲜",
+      "Russia": "俄罗斯", "Brazil": "巴西", "Korea": "韩国", "South Korea": "韩国", 
+      "Dem. Rep. Korea": "朝鲜", "North Korea": "朝鲜", "Denmark": "丹麦", 
       "Singapore": "新加坡", "Thailand": "泰国", "Italy": "意大利", "Spain": "西班牙",
       "Malaysia": "马来西亚", "Indonesia": "印度尼西亚", "Philippines": "菲律宾", "Vietnam": "越南",
       "New Zealand": "新西兰", "Switzerland": "瑞士", "Netherlands": "荷兰", "Sweden": "瑞典",
-      "Norway": "挪威", "Finland": "芬兰", "Denmark": "丹麦", "Poland": "波兰", "Turkey": "土耳其",
+      "Norway": "挪威", "Finland": "芬兰", "Poland": "波兰", "Turkey": "土耳其",
       "United Arab Emirates": "阿联酋", "South Africa": "南非", "Argentina": "阿根廷", "Mexico": "墨西哥",
       "India": "印度", "Pakistan": "巴基斯坦", "Bangladesh": "孟加拉国", "Sri Lanka": "斯里兰卡",
       "Nepal": "尼泊尔", "Bhutan": "不丹", "Mongolia": "蒙古", "Kazakhstan": "哈萨克斯坦",
@@ -78,15 +111,15 @@
       "Myanmar": "缅甸", "Maldives": "马尔代夫", "Bahrain": "巴林"
     };
 
-    // 构建反向字典：中文 -> 英文名
     const countryReverse = {};
     for (let k in countryTranslation) { 
-      // 如果多个英文名对应同一个中文，优先使用较短的（比如优先用 Korea 而不是 South Korea）
       const zhName = countryTranslation[k];
       if (!countryReverse[zhName] || k.length < countryReverse[zhName].length) {
         countryReverse[zhName] = k;
       }
     }
+    countryReverse['韩国'] = 'Korea';
+    countryReverse['朝鲜'] = 'Dem. Rep. Korea';
 
     const validCountries = {}; 
     const myChart = echarts.init(document.getElementById('map'));
@@ -95,6 +128,24 @@
       const t = i18n[currentLang];
       document.getElementById('back-btn').innerText = t.back;
       document.getElementById('lang-btn').innerText = t.langBtn;
+    }
+
+    // 生成右侧的快捷跳转菜单
+    function renderMenu() {
+      const menuEl = document.getElementById('country-menu');
+      let html = `<div class="menu-title">${currentLang === 'zh' ? '已开放地景' : 'Available Scenery'}</div>`;
+      
+      for (let engName in validCountries) {
+        const link = validCountries[engName];
+        const displayName = currentLang === 'zh' 
+          ? (countryTranslation[engName] || engName) 
+          : engName;
+        
+        html += `<a href="${link}" class="country-item"><span>${displayName}</span></a>`;
+      }
+      
+      menuEl.innerHTML = html;
+      menuEl.style.display = Object.keys(validCountries).length > 0 ? 'flex' : 'none';
     }
 
     async function loadMap() {
@@ -121,16 +172,36 @@
         }
       } catch (e) { console.error(e); }
 
+      // 地图数据加载（国内双保险 CDN）
+      const mapUrls = [
+        'https://cdn.bootcdn.net/ajax/libs/echarts/4.9.0/map/json/world.json',
+        'https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json'
+      ];
+      
+      let worldJson = null;
+      for (let url of mapUrls) {
+        try {
+          const worldRes = await fetch(url);
+          if (worldRes.ok) {
+            worldJson = await worldRes.json();
+            break;
+          }
+        } catch (e) { console.warn("CDN请求失败，尝试下一个..."); }
+      }
+
+      if (!worldJson) {
+        myChart.hideLoading();
+        document.getElementById('map').innerHTML = '<div style="text-align:center;padding-top:20vh;color:#999;">地图数据加载失败，请检查网络。</div>';
+        return;
+      }
+
       try {
-        const worldRes = await fetch('https://fastly.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json');
-        const worldJson = await worldRes.json();
         echarts.registerMap('world', worldJson);
         
         const features = worldJson.features.map(f => f.properties.name);
         const mapData = [];
         
         features.forEach(featureName => {
-          // 如果这个国家在 validCountries 里（比如 "Korea" 或 "South Korea"），就变绿
           if (validCountries[featureName]) {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
           }
@@ -167,6 +238,9 @@
             data: mapData
           }]
         });
+        
+        renderMenu();
+        
       } catch (e) { console.error(e); }
     }
 
