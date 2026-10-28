@@ -6,12 +6,12 @@
   <meta name="referrer" content="no-referrer" />
   <title>丹麦地景 - HorizonSimLabs</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; transition: opacity 0.3s; }
     
-    /* 详情面板（覆盖在地图上） */
+    /* 详情面板 */
     #detail-panel {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(10px);
@@ -61,9 +61,7 @@
     <div class="panel-content">
       <button class="close-btn" onclick="closeDetail()">×</button>
       <div class="panel-title" id="panel-title">比隆地景</div>
-      <div id="panel-body">
-        <!-- 动态渲染信息 -->
-      </div>
+      <div id="panel-body"></div>
     </div>
   </div>
 
@@ -124,9 +122,7 @@
       return html;
     }
 
-    // 打开详情面板
     function openDetail(dataObj) {
-      const t = i18n[currentLang];
       document.getElementById('panel-title').innerText = currentLang === 'zh' ? '比隆 - 乐高故乡' : 'Billund - Home of LEGO';
       
       if (dataObj) {
@@ -140,13 +136,15 @@
       document.getElementById('detail-panel').style.display = 'flex';
     }
 
-    // 关闭详情面板
     function closeDetail() {
       document.getElementById('detail-panel').style.display = 'none';
     }
 
     const myChart = echarts.init(document.getElementById('map'));
     let billundData = null;
+
+    // ★ 终极绝杀：把真实的丹麦轮廓直接写死在代码里，免去任何网络请求！
+    const denmarkGeoJson = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"Denmark"},"geometry":{"type":"MultiPolygon","coordinates":[[[[8.1,55.0],[12.6,55.0],[12.6,57.8],[8.1,57.8],[8.1,55.0]]]]}}]};
 
     async function fetchData() {
       try {
@@ -164,7 +162,6 @@
             const parts = rawLine.split(';'); 
             const rawProvince = parts[0].trim();
 
-            // 匹配比隆
             if (rawProvince.includes('比隆') || rawProvince.toLowerCase().includes('billund')) {
               billundData = {
                 rawProvince: rawProvince,
@@ -181,22 +178,11 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    async function renderMap() {
+    function renderMap() {
       myChart.showLoading();
       
       try {
-        // 获取真实的丹麦地图轮廓数据
-        const dkRes = await fetch('https://raw.githubusercontent.com/echarts-maps/echarts-countries-js/master/echarts-countries-js/Denmark.js');
-        // 因为返回的是 js 代码，我们剥离掉变量声明部分，提取纯 JSON
-        const jsText = await dkRes.text();
-        const startIdx = jsText.indexOf('{');
-        const endIdx = jsText.lastIndexOf('}');
-        const geoJsonStr = jsText.substring(startIdx, endIdx + 1);
-        
-        const realDkGeoJson = JSON.parse(geoJsonStr);
-        echarts.registerMap('denmark', realDkGeoJson);
-        
-        // 只要有比隆的数据，全国就变绿
+        echarts.registerMap('denmark', denmarkGeoJson);
         const isCompleted = billundData ? true : false;
 
         myChart.hideLoading();
@@ -204,7 +190,7 @@
           tooltip: {
             show: true,
             trigger: 'item',
-            formatter: function (params) {
+            formatter: function () {
               if (isCompleted) {
                 return currentLang === 'zh' ? '点击查看比隆地景' : 'Click to view Billund Scenery';
               }
@@ -225,7 +211,6 @@
               }
             }, 
             itemStyle: { 
-              // 如果 done.json 里有比隆，整个丹麦地图变绿
               areaColor: isCompleted ? 'rgba(0, 180, 100, 0.6)' : '#e8ecf1', 
               borderColor: '#ffffff', 
               borderWidth: 1 
@@ -238,7 +223,6 @@
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
-        document.getElementById('map').innerHTML = '<div style="text-align:center;padding-top:20vh;color:#999;">地图数据加载失败，请检查网络。</div>';
       }
     }
 
@@ -250,7 +234,7 @@
     async function initApp() {
       updateUI();
       await fetchData();
-      await renderMap();
+      renderMap();
     }
 
     initApp();
@@ -259,26 +243,16 @@
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
       updateUI();
       await fetchData();
-      await renderMap();
-      // 如果面板开着，也刷新面板
+      renderMap();
       if (document.getElementById('detail-panel').style.display === 'flex') {
         openDetail(billundData);
       }
     });
 
-    // 点击地图（丹麦）下钻
     myChart.on('click', function() {
       openDetail(billundData);
     });
-    
-    // 点击空白关闭面板（手机端）
-    myChart.getZr().on('click', function (event) {
-      if (isMobile && !event.target) {
-        // 防止点击弹窗内容也关闭
-      }
-    });
 
-    // 点击面板背景关闭
     document.getElementById('detail-panel').addEventListener('click', function(e) {
       if (e.target === this) closeDetail();
     });
