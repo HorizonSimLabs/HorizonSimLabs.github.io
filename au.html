@@ -56,7 +56,10 @@
       'South Australia': { zh: '南澳大利亚州', en: 'South Australia' },
       'Tasmania': { zh: '塔斯马尼亚州', en: 'Tasmania' },
       'Northern Territory': { zh: '北领地', en: 'Northern Territory' },
-      'Australian Capital Territory': { zh: '首都领地', en: 'Australian Capital Territory' }
+      'Australian Capital Territory': { zh: '首都领地', en: 'Australian Capital Territory' },
+      'Christmas Island': { zh: '圣诞岛', en: 'Christmas Island' },
+      'Norfolk Island': { zh: '诺福克岛', en: 'Norfolk Island' },
+      'Ashmore and Cartier Islands': { zh: '阿什莫尔和卡捷岛', en: 'Ashmore and Cartier Islands' }
     };
 
     const cityToState = {
@@ -144,9 +147,8 @@
     async function renderMap() {
       myChart.showLoading();
       try {
-        // ★ 直接读取你本地的 Australia.json
         const res = await fetch('./Australia.json');
-        if (!res.ok) throw new Error("找不到 Australia.json，请检查文件路径");
+        if (!res.ok) throw new Error("找不到 Australia.json");
         const realGeoJson = await res.json();
 
         echarts.registerMap('australia', realGeoJson);
@@ -159,10 +161,14 @@
         features.forEach(featureName => {
           const matchItem = allParsedData.find(item => {
             const itemRaw = item.rawProvince;
-            if (cityToState[itemRaw] === getTranslatedName(featureName)) return true;
             const dictZh = auNameDict[featureName] ? auNameDict[featureName].zh : '';
+            
+            // ★ 核心修复：严格匹配，绝不乱蹭字！
+            // 如果 done.json 是 "悉尼"，且底图是 "新南威尔士州"，映射成立。
+            if (cityToState[itemRaw] === getTranslatedName(featureName)) return true;
+            // 如果 done.json 是 "昆士兰州"，且底图是 "昆士兰州"，直接匹配。
             if (itemRaw === featureName || itemRaw === dictZh) return true;
-            if (dictZh && (itemRaw.includes(dictZh) || dictZh.includes(itemRaw))) return true;
+            
             return false;
           });
           
