@@ -62,7 +62,7 @@
       myChart.showLoading();
       try {
         // 注意：这里的文件名根据你下载的文件名来定，如果是 New Zealand.json 记得带空格
-        const res = await fetch('./New Zealand.json'); 
+        const res = await fetch('./New_Zealand.json'); 
         const realGeoJson = await res.json();
         echarts.registerMap('newzealand', realGeoJson);
         const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
