@@ -62,7 +62,7 @@
       myChart.showLoading();
       try {
         // ★ 从 npm 镜像加载真实的澳大利亚州界数据，国内无墙
-        const res = await fetch('https://cdn.jsdelivr.net/npm/echarts-countries-js@1.0.5/echarts-countries-js/Australia.min.js');
+        const res = await fetch('./au.json');
         const text = await res.text(); const start = text.indexOf('{'); const end = text.lastIndexOf('}');
         const realGeoJson = JSON.parse(text.substring(start, end + 1));
         echarts.registerMap('australia', realGeoJson);
