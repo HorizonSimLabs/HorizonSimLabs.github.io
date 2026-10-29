@@ -27,12 +27,10 @@
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
-    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在加载土耳其省级地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
@@ -48,30 +46,57 @@
       en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
     };
 
-    // 土耳其主要省份/城市的中英翻译字典
-    const trNameDict = {
-      'Istanbul': { zh: '伊斯坦布尔', en: 'Istanbul' },
-      'Ankara': { zh: '安卡拉', en: 'Ankara' },
-      'Izmir': { zh: '伊兹密尔', en: 'Izmir' },
-      'Antalya': { zh: '安塔利亚', en: 'Antalya' },
-      'Bursa': { zh: '布尔萨', en: 'Bursa' },
-      'Adana': { zh: '阿达纳', en: 'Adana' },
-      'Konya': { zh: '科尼亚', en: 'Konya' },
-      'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' },
-      'Trabzon': { zh: '特拉布宗', en: 'Trabzon' },
-      'Nevşehir': { zh: '内夫谢希尔(卡帕多奇亚)', en: 'Nevsehir (Cappadocia)' }
+    // ★ 土耳其真实 81 个省/城市中英对照（完整版）
+    const trCityDict = {
+      'Adana': { zh: '阿达纳', en: 'Adana' }, 'Adıyaman': { zh: '阿德亚曼', en: 'Adıyaman' },
+      'Afyonkarahisar': { zh: '阿菲永卡拉希萨尔', en: 'Afyonkarahisar' }, 'Ağrı': { zh: '阿勒', en: 'Ağrı' },
+      'Aksaray': { zh: '阿克萨赖', en: 'Aksaray' }, 'Amasya': { zh: '阿马西亚', en: 'Amasya' },
+      'Ankara': { zh: '安卡拉', en: 'Ankara' }, 'Antalya': { zh: '安塔利亚', en: 'Antalya' },
+      'Ardahan': { zh: '阿尔达汉', en: 'Ardahan' }, 'Artvin': { zh: '阿尔特温', en: 'Artvin' },
+      'Aydın': { zh: '艾登', en: 'Aydın' }, 'Balıkesir': { zh: '巴勒克埃西尔', en: 'Balıkesir' },
+      'Bartın': { zh: '巴尔滕', en: 'Bartın' }, 'Batman': { zh: '巴特曼', en: 'Batman' },
+      'Bayburt': { zh: '巴伊布尔特', en: 'Bayburt' }, 'Bilecik': { zh: '比莱吉克', en: 'Bilecik' },
+      'Bingöl': { zh: '宾格尔', en: 'Bingöl' }, 'Bitlis': { zh: '比特利斯', en: 'Bitlis' },
+      'Bolu': { zh: '博卢', en: 'Bolu' }, 'Burdur': { zh: '布尔杜尔', en: 'Burdur' },
+      'Bursa': { zh: '布尔萨', en: 'Bursa' }, 'Çanakkale': { zh: '恰纳卡莱', en: 'Çanakkale' },
+      'Çankırı': { zh: '昌克勒', en: 'Çankırı' }, 'Çorum': { zh: '乔鲁姆', en: 'Çorum' },
+      'Denizli': { zh: '代尼兹利', en: 'Denizli' }, 'Diyarbakır': { zh: '迪亚巴克尔', en: 'Diyarbakır' },
+      'Düzce': { zh: '迪兹杰', en: 'Düzce' }, 'Edirne': { zh: '埃迪尔内', en: 'Edirne' },
+      'Elazığ': { zh: '埃拉泽', en: 'Elazığ' }, 'Erzincan': { zh: '埃尔津詹', en: 'Erzincan' },
+      'Erzurum': { zh: '埃尔祖鲁姆', en: 'Erzurum' }, 'Eskişehir': { zh: '埃斯基谢希尔', en: 'Eskişehir' },
+      'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 'Giresun': { zh: '吉雷松', en: 'Giresun' },
+      'Gümüşhane': { zh: '居米什哈内', en: 'Gümüşhane' }, 'Hakkâri': { zh: '哈卡里', en: 'Hakkâri' },
+      'Hatay': { zh: '哈塔伊', en: 'Hatay' }, 'Iğdır': { zh: '厄德尔', en: 'Iğdır' },
+      'Isparta': { zh: '伊斯帕尔塔', en: 'Isparta' }, 'İstanbul': { zh: '伊斯坦布尔', en: 'Istanbul' },
+      'İzmir': { zh: '伊兹密尔', en: 'Izmir' }, 'Kahramanmaraş': { zh: '卡赫拉曼马拉什', en: 'Kahramanmaraş' },
+      'Karabük': { zh: '卡拉比克', en: 'Karabük' }, 'Karaman': { zh: '卡拉曼', en: 'Karaman' },
+      'Kars': { zh: '卡尔斯', en: 'Kars' }, 'Kastamonu': { zh: '卡斯塔莫努', en: 'Kastamonu' },
+      'Kayseri': { zh: '开塞利', en: 'Kayseri' }, 'Kırıkkale': { zh: '克勒克卡莱', en: 'Kırıkkale' },
+      'Kırklareli': { zh: '克尔克拉雷利', en: 'Kırklareli' }, 'Kırşehir': { zh: '克尔谢希尔', en: 'Kırşehir' },
+      'Kilis': { zh: '基利斯', en: 'Kilis' }, 'Kocaeli': { zh: '科贾埃利', en: 'Kocaeli' },
+      'Konya': { zh: '科尼亚', en: 'Konya' }, 'Kütahya': { zh: '屈塔希亚', en: 'Kütahya' },
+      'Malatya': { zh: '马拉蒂亚', en: 'Malatya' }, 'Manisa': { zh: '马尼萨', en: 'Manisa' },
+      'Mardin': { zh: '马尔丁', en: 'Mardin' }, 'Mersin': { zh: '梅尔辛', en: 'Mersin' },
+      'Muğla': { zh: '穆拉', en: 'Muğla' }, 'Muş': { zh: '穆什', en: 'Muş' },
+      'Nevşehir': { zh: '内夫谢希尔', en: 'Nevşehir' }, 'Niğde': { zh: '尼代', en: 'Niğde' },
+      'Ordu': { zh: '奥尔杜', en: 'Ordu' }, 'Osmaniye': { zh: '奥斯曼尼耶', en: 'Osmaniye' },
+      'Rize': { zh: '里泽', en: 'Rize' }, 'Sakarya': { zh: '萨卡里亚', en: 'Sakarya' },
+      'Samsun': { zh: '萨姆松', en: 'Samsun' }, 'Siirt': { zh: '锡尔特', en: 'Siirt' },
+      'Sinop': { zh: '锡诺普', en: 'Sinop' }, 'Sivas': { zh: '锡瓦斯', en: 'Sivas' },
+      'Şanlıurfa': { zh: '尚勒乌尔法', en: 'Şanlıurfa' }, 'Şırnak': { zh: '舍尔纳克', en: 'Şırnak' },
+      'Tekirdağ': { zh: '泰基尔达', en: 'Tekirdağ' }, 'Tokat': { zh: '托卡特', en: 'Tokat' },
+      'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 'Tunceli': { zh: '通杰利', en: 'Tunceli' },
+      'Uşak': { zh: '乌沙克', en: 'Uşak' }, 'Van': { zh: '凡城', en: 'Van' },
+      'Yalova': { zh: '亚洛瓦', en: 'Yalova' }, 'Yozgat': { zh: '约兹加特', en: 'Yozgat' },
+      'Zonguldak': { zh: '宗古尔达克', en: 'Zonguldak' }
     };
 
+    // 因为土耳其数据太大，这里使用官方的极简真实省界数据源做双重保护
+    const trGeoJsonUrl = 'https://fastly.jsdelivr.net/gh/cihadturhan/geojson-turkey@master/tr-cities-utf8.json';
+
     function getTranslatedName(rawName) {
-      // 如果底图名字直接有翻译，直接返回；否则如果没有翻译，保留原名
-      if (trNameDict[rawName]) {
-        return currentLang === 'zh' ? trNameDict[rawName].zh : trNameDict[rawName].en;
-      }
-      // 阿里云/维基百科的土耳其数据可能是土耳其语，这里做模糊兜底
-      if (currentLang === 'zh') {
-        if (rawName === 'İstanbul') return '伊斯坦布尔';
-        if (rawName === 'Ankara') return '安卡拉';
-        if (rawName === 'İzmir') return '伊兹密尔';
+      if (trCityDict[rawName]) {
+        return currentLang === 'zh' ? trCityDict[rawName].zh : trCityDict[rawName].en;
       }
       return rawName;
     }
@@ -144,9 +169,7 @@
     async function renderMap() {
       myChart.showLoading();
       try {
-        // ★ 核心：获取真实的土耳其省级边界 GeoJSON
-        // 注意：因为 github raw 文件在某些地区会被拦截，我们采用 GeoJSON 托管仓库的 CDN
-        const trRes = await fetch('https://fastly.jsdelivr.net/gh/cihadturhan/geojson-turkey@master/tr-cities-utf8.json');
+        const trRes = await fetch(trGeoJsonUrl);
         const realTrGeoJson = await trRes.json();
 
         echarts.registerMap('turkey', realTrGeoJson);
@@ -157,17 +180,17 @@
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
         features.forEach(featureName => {
-          // 强制模糊匹配：底图名字和 JSON 名字互相包含即匹配（比如 "Istanbul" 和 "伊斯坦布尔"）
           const matchItem = allParsedData.find(item => {
             const itemRaw = item.rawProvince;
             
-            // 如果 JSON 里写了中文或英文，去字典里查一下对应翻译
-            for (let key in trNameDict) {
+            // 如果 JSON 写的是中文（比如“伊斯坦布尔”），去字典里查对应底图名（“İstanbul”）
+            for (let key in trCityDict) {
               if (key === featureName) {
-                const dictZh = trNameDict[key].zh;
+                const dictZh = trCityDict[key].zh;
                 if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true;
               }
             }
+            // 如果写的是英文或底图原名
             return itemRaw === featureName || featureName.includes(itemRaw) || itemRaw.includes(featureName);
           });
           
@@ -178,7 +201,6 @@
         });
 
         myChart.hideLoading();
-        document.getElementById('loading-tip').style.display = 'none';
 
         myChart.setOption({
           tooltip: { show: false },
@@ -205,8 +227,7 @@
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图数据加载失败，请检查网络。';
-        document.getElementById('loading-tip').style.color = '#ef4444';
+        document.getElementById('map').innerHTML = '<div style="text-align:center;padding-top:20vh;color:#999;">地图加载失败，请检查网络。</div>';
       }
     }
 
