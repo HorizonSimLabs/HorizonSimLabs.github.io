@@ -10,10 +10,19 @@
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
-    #my-tooltip { position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px; padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap; }
+    #my-tooltip {
+      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
+      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
+    }
     .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
-    .ui-btn { position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none; backdrop-filter: blur(10px); transition: 0.3s; }
+    .ui-btn {
+      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
+      backdrop-filter: blur(10px); transition: 0.3s;
+    }
     .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
@@ -28,66 +37,231 @@
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
   <div id="my-tooltip"></div>
+
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     let currentLang = 'zh';
 
-    const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
-    const nzNameDict = { 'Auckland': { zh: '奥克兰', en: 'Auckland' }, 'Wellington': { zh: '惠灵顿', en: 'Wellington' }, 'Canterbury': { zh: '坎特伯雷', en: 'Canterbury' }, 'Otago': { zh: '奥塔哥', en: 'Otago' }, 'Waikato': { zh: '怀卡托', en: 'Waikato' } };
-    const nzCityKeywords = ['新西兰', '奥克兰', '惠灵顿', '皇后镇', '基督城', '但尼丁', 'New Zealand', 'Auckland', 'Wellington', 'Queenstown', 'Christchurch'];
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
+    };
 
-    function getTranslatedName(rawName) { if (nzNameDict[rawName]) return currentLang === 'zh' ? nzNameDict[rawName].zh : nzNameDict[rawName].en; return rawName; }
-    function parseBilingual(text) { if (!text) return ''; const parts = text.split('|'); return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim(); }
+    const nzNameDict = {
+      'Northland': { zh: '北地', en: 'Northland' },
+      'Auckland': { zh: '奥克兰', en: 'Auckland' },
+      'Waikato': { zh: '怀卡托', en: 'Waikato' },
+      'Bay of Plenty': { zh: '丰盛湾', en: 'Bay of Plenty' },
+      'Gisborne': { zh: '吉斯伯恩', en: 'Gisborne' },
+      'Hawke\'s Bay': { zh: '霍克斯湾', en: 'Hawke\'s Bay' },
+      'Taranaki': { zh: '塔拉纳基', en: 'Taranaki' },
+      'Manawatu-Wanganui': { zh: '马纳瓦图-旺加努伊', en: 'Manawatu-Wanganui' },
+      'Wellington': { zh: '惠灵顿', en: 'Wellington' },
+      'Tasman': { zh: '塔斯曼', en: 'Tasman' },
+      'Nelson': { zh: '尼尔森', en: 'Nelson' },
+      'Marlborough': { zh: '马尔堡', en: 'Marlborough' },
+      'West Coast': { zh: '西海岸', en: 'West Coast' },
+      'Canterbury': { zh: '坎特伯雷', en: 'Canterbury' },
+      'Otago': { zh: '奥塔哥', en: 'Otago' },
+      'Southland': { zh: '南地', en: 'Southland' }
+    };
+
+    const cityToRegion = {
+      '奥克兰': 'Auckland', 'Auckland': 'Auckland',
+      '惠灵顿': 'Wellington', 'Wellington': 'Wellington',
+      '基督城': 'Canterbury', 'Christchurch': 'Canterbury',
+      '皇后镇': 'Otago', 'Queenstown': 'Otago', '但尼丁': 'Otago', 'Dunedin': 'Otago',
+      '汉密尔顿': 'Waikato', 'Hamilton': 'Waikato',
+      '陶朗加': 'Bay of Plenty', 'Tauranga': 'Bay of Plenty',
+      '内皮尔': 'Hawke\'s Bay', 'Napier': 'Hawke\'s Bay',
+      '尼尔森': 'Nelson', 'Nelson': 'Nelson'
+    };
+
+    function getTranslatedName(rawName) {
+      if (nzNameDict[rawName]) return currentLang === 'zh' ? nzNameDict[rawName].zh : nzNameDict[rawName].en;
+      return rawName;
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim();
+    }
+
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
-      const t = i18n[currentLang]; const displayAuthor = parseBilingual(author); const displayFreeLevel = parseBilingual(freeLevel); const displayPaidLevel = parseBilingual(paidLevel); const displayRemark = parseBilingual(remark); const parsedFreeLink = parseBilingual(freeLink); const parsedPaidLink = parseBilingual(paidLink);
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+      
       const titleName = getTranslatedName(rawProvince);
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div><div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
-      function formatLink(link) { if (!link || link === '无' || link === 'None') return t.noLink; if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`; return `<span style="color:#333; font-weight:bold;">${link}</span>`; }
+
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
+      }
+
       if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
       if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
       if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
+      
       return html;
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let allParsedData = []; const provinceDataMap = {};
+    let allParsedData = []; 
+    const provinceDataMap = {};
 
     async function fetchData() {
-      allParsedData = []; const t = i18n[currentLang];
-      try { let doneRes = await fetch('./done.json?t=' + new Date().getTime()); if (doneRes.ok) { let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim(); text.split(',').forEach(line => { let rawLine = line.trim().replace(/；/g, ';'); if (!rawLine) return; const parts = rawLine.split(';'); allParsedData.push({ rawProvince: parts[0].trim(), author: parts[1] || t.unknown, freeLink: parts[2] || '', freeLevel: parts[3] || '', paidLink: parts[4] || '', paidLevel: parts[5] || '', remark: parts[6] || '' }); }); } } catch (e) { }
+      allParsedData = [];
+      const t = i18n[currentLang];
+      try {
+        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
+          text.split(',').forEach(line => {
+            let rawLine = line.trim().replace(/；/g, ';');
+            if (!rawLine) return;
+            const parts = rawLine.split(';');
+            const rawProvince = parts[0].trim();
+            allParsedData.push({
+              rawProvince: rawProvince,
+              author: parts[1] || t.unknown,
+              freeLink: parts[2] || '', freeLevel: parts[3] || '',
+              paidLink: parts[4] || '', paidLevel: parts[5] || '',
+              remark: parts[6] || ''
+            });
+          });
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
     async function renderMap() {
       myChart.showLoading();
       try {
-        // 注意：这里的文件名根据你下载的文件名来定，如果是 New Zealand.json 记得带空格
+        // ★ 核心修改：读取你本地的 New_Zealand.json 文件
         const res = await fetch('./New_Zealand.json'); 
+        if (!res.ok) throw new Error("找不到 New_Zealand.json");
+        
         const realGeoJson = await res.json();
         echarts.registerMap('newzealand', realGeoJson);
-        const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
-        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
         
-        // 只要匹配到新西兰任意关键字，全图变绿
-        const hasNzData = allParsedData.find(item => nzCityKeywords.some(kw => item.rawProvince.includes(kw) || kw.includes(item.rawProvince)));
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+        
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
         features.forEach(featureName => {
-          if (hasNzData) {
+          // 精准匹配：你在 done.json 里写了城市，自动归属到对应大区
+          const matchItem = allParsedData.find(item => {
+            const itemRaw = item.rawProvince;
+            
+            // 1. 如果写了全国
+            if (itemRaw === '新西兰' || itemRaw === 'New Zealand') return true;
+            
+            // 2. 如果写了大区名字
+            const dictZh = nzNameDict[featureName] ? nzNameDict[featureName].zh : '';
+            if (itemRaw === featureName || itemRaw === dictZh) return true;
+            
+            // 3. 如果写了城市（比如皇后镇 -> Otago）
+            if (cityToRegion[itemRaw] === featureName) return true;
+            
+            return false;
+          });
+          
+          if (matchItem) {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(hasNzData.rawProvince, hasNzData.author, hasNzData.freeLink, hasNzData.freeLevel, hasNzData.paidLink, hasNzData.paidLevel, hasNzData.remark);
+            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
           }
         });
-        myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
-        myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'newzealand', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
-      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载本地 New Zealand.json 失败'; }
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'newzealand', 
+            roam: true,
+            zoom: 1.2,
+            label: { 
+              show: true, 
+              fontSize: isMobile ? 8 : 10, 
+              color: '#333',
+              formatter: function (params) { return getTranslatedName(params.name); }
+            }, 
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false, 
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        document.getElementById('loading-tip').innerHTML = '加载本地 New_Zealand.json 失败，请检查文件是否存在。';
+      }
     }
 
-    function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
-    async function initApp() { updateUI(); await fetchData(); renderMap(); } initApp();
-    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); renderMap(); });
-    if (!isMobile) { let isOverBox = false; let hideTimer = null; let currentHoverName = null; myChart.on('mouseover', function (params) { if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return; clearTimeout(hideTimer); currentHoverName = params.name; tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block'; if (params.event && params.event.event) { const e = params.event.event; let x = e.clientX + 20; let y = e.clientY - 20; if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20; if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10; if (y < 10) y = 10; tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px'; } }); myChart.on('mouseout', function () { hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300); }); tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); }); tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; }); }
-    myChart.on('click', function(params) { if (isMobile && provinceDataMap[params.name]) { tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto'; tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)'; } });
-    myChart.getZr().on('click', function (event) { if (isMobile && !event.target) tooltipEl.style.display = 'none'; });
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI(); await fetchData(); renderMap();
+    });
+
+    if (!isMobile) {
+      let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+        clearTimeout(hideTimer); currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+        if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20; let y = e.clientY - 20;
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
+          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+        }
+      });
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+      });
+      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+    }
+
+    myChart.on('click', function(params) {
+      if (isMobile && provinceDataMap[params.name]) {
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+      }
+    });
+    
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) tooltipEl.style.display = 'none';
+    });
+
     window.addEventListener('resize', () => myChart.resize());
   </script>
 </body>
