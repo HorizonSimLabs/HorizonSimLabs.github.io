@@ -6,13 +6,7 @@
   <meta name="referrer" content="no-referrer" />
   <title>马来西亚地景 - HorizonSimLabs</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
-  
-  <!-- 引入 ECharts -->
   <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
-  
-  <!-- ★ 核心：直接引入你本地的 Malaysia.js -->
-  <script src="./Malaysia.js"></script>
-
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
@@ -55,25 +49,17 @@
     };
 
     const myNameDict = { 
-      'Johor': { zh: '柔佛', en: 'Johor' }, 
-      'Kedah': { zh: '吉打', en: 'Kedah' }, 
-      'Kelantan': { zh: '吉兰丹', en: 'Kelantan' }, 
-      'Malacca': { zh: '马六甲', en: 'Malacca' }, 
-      'Negeri Sembilan': { zh: '森美兰', en: 'Negeri Sembilan' }, 
-      'Pahang': { zh: '彭亨', en: 'Pahang' }, 
-      'Perak': { zh: '霹雳', en: 'Perak' }, 
-      'Perlis': { zh: '玻璃市', en: 'Perlis' }, 
-      'Selangor': { zh: '雪兰莪', en: 'Selangor' }, 
-      'Terengganu': { zh: '登嘉楼', en: 'Terengganu' }, 
-      'Sabah': { zh: '沙巴', en: 'Sabah' }, 
-      'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 
-      'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
-      'W.P. Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
-      'Labuan': { zh: '纳闽', en: 'Labuan' }, 
-      'W.P. Labuan': { zh: '纳闽', en: 'Labuan' },
+      'Johor': { zh: '柔佛', en: 'Johor' }, 'Kedah': { zh: '吉打', en: 'Kedah' }, 
+      'Kelantan': { zh: '吉兰丹', en: 'Kelantan' }, 'Malacca': { zh: '马六甲', en: 'Malacca' }, 
+      'Negeri Sembilan': { zh: '森美兰', en: 'Negeri Sembilan' }, 'Pahang': { zh: '彭亨', en: 'Pahang' }, 
+      'Perak': { zh: '霹雳', en: 'Perak' }, 'Perlis': { zh: '玻璃市', en: 'Perlis' }, 
+      'Selangor': { zh: '雪兰莪', en: 'Selangor' }, 'Terengganu': { zh: '登嘉楼', en: 'Terengganu' }, 
+      'Sabah': { zh: '沙巴', en: 'Sabah' }, 'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 
+      'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' }, 'Labuan': { zh: '纳闽', en: 'Labuan' }, 
       'Putrajaya': { zh: '布城', en: 'Putrajaya' } 
     };
 
+    // ★ 把吉隆坡和槟城的别名写死
     const cityToState = {
       '吉隆坡': 'Kuala Lumpur', 'KL': 'Kuala Lumpur',
       '槟城': 'Pulau Pinang', 'Penang': 'Pulau Pinang',
@@ -147,17 +133,57 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    function renderMap() {
-      myChart.showLoading();
-      
-      try {
-        // ★ 直接从引入的 JS 中获取地图数据
-        const mapDataObj = echarts.getMap('Malaysia') || echarts.getMap('malaysia') || echarts.getMap('马来西亚');
-        if (!mapDataObj) {
-          throw new Error("未能获取到地图数据，请确保你的 Malaysia.js 已经放在同级目录且能正常加载。");
+    // ★ 终极解密算法（完全照搬 ECharts 源码）
+    function decodeGeoJson(encodedGeoJson) {
+      if (!encodedGeoJson.UTF8Encoding) return encodedGeoJson;
+      const decodePolygon = (coordinate, encodeOffsets) => {
+        const result = [];
+        let prevX = encodeOffsets[0];
+        let prevY = encodeOffsets[1];
+        for (let i = 0; i < coordinate.length; i += 2) {
+          let x = coordinate.charCodeAt(i) - 64;
+          let y = coordinate.charCodeAt(i + 1) - 64;
+          x = (x >> 1) ^ (-(x & 1));
+          y = (y >> 1) ^ (-(y & 1));
+          x += prevX;
+          y += prevY;
+          prevX = x;
+          prevY = y;
+          result.push([x / 1024, y / 1024]);
         }
+        return result;
+      };
+      
+      const newFeatures = encodedGeoJson.features.map(feature => {
+        const geometry = feature.geometry;
+        let newCoordinates = [];
+        if (geometry.type === 'Polygon') {
+          newCoordinates = geometry.coordinates.map((polygon, i) => decodePolygon(polygon, geometry.encodeOffsets[i]));
+        } else if (geometry.type === 'MultiPolygon') {
+          newCoordinates = geometry.coordinates.map((polygonArray, i) => {
+            return polygonArray.map((ring, j) => decodePolygon(ring, geometry.encodeOffsets[i][j]));
+          });
+        }
+        return {
+          type: 'Feature',
+          properties: feature.properties,
+          geometry: { type: geometry.type, coordinates: newCoordinates }
+        };
+      });
+      return { type: 'FeatureCollection', features: newFeatures };
+    }
+
+    async function renderMap() {
+      myChart.showLoading();
+      try {
+        const res = await fetch('./Malaysia.json'); 
+        let realGeoJson = await res.json();
         
-        const features = mapDataObj.geoJson.features.map(f => f.properties.name);
+        // 解密
+        realGeoJson = decodeGeoJson(realGeoJson);
+        echarts.registerMap('malaysia', realGeoJson);
+        
+        const features = realGeoJson.features.map(f => f.properties.name);
         const mapData = [];
         
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
@@ -167,13 +193,13 @@
             const itemRaw = item.rawProvince;
             const dictZh = myNameDict[featureName] ? myNameDict[featureName].zh : '';
             
-            // 1. 中文或原样匹配
+            // 1. 原样或中文匹配
             if (itemRaw === featureName || itemRaw === dictZh) return true;
             
             // 2. 城市强行映射
             if (cityToState[itemRaw] === featureName) return true;
             
-            // 3. 暴力模糊匹配
+            // 3. 极度暴力模糊匹配
             const cleanFeature = featureName.toLowerCase().replace(/[^a-z]/g, '');
             const cleanItem = itemRaw.toLowerCase().replace(/[^a-z\u4e00-\u9fa5]/g, '');
             if (cleanFeature.includes(cleanItem) || cleanItem.includes(cleanFeature)) return true;
@@ -194,7 +220,7 @@
           tooltip: { show: false },
           series: [{
             type: 'map',
-            map: mapDataObj ? mapDataObj.mapName : 'Malaysia', 
+            map: 'malaysia', 
             roam: true,
             zoom: 1.2,
             label: { 
@@ -213,7 +239,7 @@
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图加载失败：' + e.message;
+        document.getElementById('loading-tip').innerHTML = '地图解析失败，请检查 Malaysia.json 是否正确。';
       }
     }
 
@@ -222,12 +248,7 @@
       document.getElementById('back-btn').innerText = i18n[currentLang].back;
     }
 
-    async function initApp() { 
-      updateUI(); 
-      await fetchData(); 
-      // 延迟加载，确保马来西亚 JS 已经被浏览器解析完毕
-      setTimeout(renderMap, 200); 
-    }
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
     initApp();
 
     document.getElementById('lang-btn').addEventListener('click', async () => {
