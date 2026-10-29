@@ -34,7 +34,22 @@
     let currentLang = 'zh';
 
     const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
-    const trNameDict = { 'Istanbul': { zh: '伊斯坦布尔', en: 'Istanbul' }, 'Ankara': { zh: '安卡拉', en: 'Ankara' }, 'Izmir': { zh: '伊兹密尔', en: 'Izmir' }, 'Antalya': { zh: '安塔利亚', en: 'Antalya' }, 'Bursa': { zh: '布尔萨', en: 'Bursa' }, 'Adana': { zh: '阿达纳', en: 'Adana' }, 'Konya': { zh: '科尼亚', en: 'Konya' }, 'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 'Nevşehir': { zh: '内夫谢希尔', en: 'Nevsehir' } };
+    
+    // ★ 彻底解决土耳其语特殊字符和拼写问题
+    const trNameDict = { 
+      'İstanbul': { zh: '伊斯坦布尔', en: 'Istanbul' }, 
+      'Istanbul': { zh: '伊斯坦布尔', en: 'Istanbul' },
+      'Ankara': { zh: '安卡拉', en: 'Ankara' }, 
+      'İzmir': { zh: '伊兹密尔', en: 'Izmir' }, 
+      'Izmir': { zh: '伊兹密尔', en: 'Izmir' }, 
+      'Antalya': { zh: '安塔利亚', en: 'Antalya' }, 
+      'Bursa': { zh: '布尔萨', en: 'Bursa' }, 
+      'Adana': { zh: '阿达纳', en: 'Adana' }, 
+      'Konya': { zh: '科尼亚', en: 'Konya' }, 
+      'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 
+      'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 
+      'Nevşehir': { zh: '内夫谢希尔', en: 'Nevsehir' } 
+    };
 
     function getTranslatedName(rawName) { if (trNameDict[rawName]) return currentLang === 'zh' ? trNameDict[rawName].zh : trNameDict[rawName].en; return rawName; }
     function parseBilingual(text) { if (!text) return ''; const parts = text.split('|'); return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim(); }
@@ -64,16 +79,37 @@
         echarts.registerMap('turkey', realGeoJson);
         const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+        
         features.forEach(featureName => {
+          // ★ 核心修复：兼容各种拼写
           const matchItem = allParsedData.find(item => {
             const dictZh = trNameDict[featureName] ? trNameDict[featureName].zh : '';
-            return item.rawProvince === featureName || item.rawProvince === dictZh;
+            
+            // 1. 原样匹配
+            if (item.rawProvince === featureName || item.rawProvince === dictZh) return true;
+            
+            // 2. 消除土耳其字母的干扰 (İ 变 I)
+            const cleanFeature = featureName.replace(/İ/g, 'I').replace(/ı/g, 'i').toLowerCase();
+            const cleanItem = item.rawProvince.replace(/İ/g, 'I').replace(/ı/g, 'i').toLowerCase();
+            
+            if (cleanItem === cleanFeature) return true;
+            
+            return false;
           });
-          if (matchItem) { mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); }
+          
+          if (matchItem) { 
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); 
+            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); 
+          }
         });
+        
         myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
         myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'turkey', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
-      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载本地 Turkey.json 失败'; }
+      } catch (e) { 
+        myChart.hideLoading(); 
+        document.getElementById('loading-tip').innerHTML = '加载本地 Turkey.json 失败'; 
+        console.error(e);
+      }
     }
 
     function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
