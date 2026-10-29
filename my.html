@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在加载马来西亚地图...</div>
+  <div id="loading-tip">正在加载真实马来西亚地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
@@ -48,7 +48,6 @@
       en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
     };
 
-    // 全量字典
     const myNameDict = { 
       'Johor': { zh: '柔佛', en: 'Johor' }, 'Kedah': { zh: '吉打', en: 'Kedah' }, 
       'Kelantan': { zh: '吉兰丹', en: 'Kelantan' }, 'Malacca': { zh: '马六甲', en: 'Malacca' }, 
@@ -57,16 +56,9 @@
       'Selangor': { zh: '雪兰莪', en: 'Selangor' }, 'Terengganu': { zh: '登嘉楼', en: 'Terengganu' }, 
       'Sabah': { zh: '沙巴', en: 'Sabah' }, 'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 
       'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' }, 
-      'W.P. Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
-      'Labuan': { zh: '纳闽', en: 'Labuan' }, 'W.P. Labuan': { zh: '纳闽', en: 'Labuan' },
-      'Putrajaya': { zh: '布城', en: 'Putrajaya' },
-      'Pulau Pinang': { zh: '槟城', en: 'Penang' }
+      'Labuan': { zh: '纳闽', en: 'Labuan' }, 
+      'Putrajaya': { zh: '布城', en: 'Putrajaya' }
     };
-
-    function getTranslatedName(rawName) {
-      if (myNameDict[rawName]) return currentLang === 'zh' ? myNameDict[rawName].zh : myNameDict[rawName].en;
-      return rawName;
-    }
 
     function parseBilingual(text) {
       if (!text) return '';
@@ -74,7 +66,7 @@
       return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim();
     }
 
-    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+    function buildItemHtml(name, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
       const t = i18n[currentLang];
       const displayAuthor = parseBilingual(author);
       const displayFreeLevel = parseBilingual(freeLevel);
@@ -82,10 +74,8 @@
       const displayRemark = parseBilingual(remark);
       const parsedFreeLink = parseBilingual(freeLink);
       const parsedPaidLink = parseBilingual(paidLink);
-      
-      const titleName = getTranslatedName(rawProvince);
 
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;color:#0f172a;">【${name}】</div>`;
       html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
       html += `<div>${t.download}</div>`;
       
@@ -103,12 +93,10 @@
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let allParsedData = []; 
-    const provinceDataMap = {};
+    let klData = null;
+    let pgData = null;
 
     async function fetchData() {
-      allParsedData = [];
-      const t = i18n[currentLang];
       try {
         let doneRes = await fetch('./done.json?t=' + new Date().getTime());
         if (doneRes.ok) {
@@ -118,19 +106,23 @@
             if (!rawLine) return;
             const parts = rawLine.split(';');
             const rawProvince = parts[0].trim();
-            allParsedData.push({
-              rawProvince: rawProvince,
-              author: parts[1] || t.unknown,
+            
+            const dataObj = {
+              author: parts[1] || '未知',
               freeLink: parts[2] || '', freeLevel: parts[3] || '',
               paidLink: parts[4] || '', paidLevel: parts[5] || '',
               remark: parts[6] || ''
-            });
+            };
+
+            // 寻找吉隆坡和槟城的数据
+            if (rawProvince === '吉隆坡') klData = dataObj;
+            if (rawProvince === '槟城') pgData = dataObj;
           });
         }
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    // ECharts 官方解密代码
+    // 官方解码算法
     function decodeGeoJson(encodedGeoJson) {
       if (!encodedGeoJson.UTF8Encoding) return encodedGeoJson;
       const decodePolygon = (coordinate, encodeOffsets) => {
@@ -169,37 +161,22 @@
     async function renderMap() {
       myChart.showLoading();
       try {
+        // 读取你本地的高精度真实地图文件
         const res = await fetch('./Malaysia.json'); 
         let realGeoJson = await res.json();
         
+        // 解码
         realGeoJson = decodeGeoJson(realGeoJson);
         echarts.registerMap('malaysia', realGeoJson);
         
         const features = realGeoJson.features.map(f => f.properties.name);
         const mapData = [];
-        
-        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
-        // ★ 修复核心：只要你的 JSON 里有“吉隆坡”、“槟城”、“马六甲”，就强行给对应的州上色！
         features.forEach(featureName => {
-          let matchItem = null;
-
-          // 强制绑定（无视任何标点符号、大小写）
-          if (featureName.includes('Kuala Lumpur') || featureName.includes('吉隆坡')) {
-            matchItem = allParsedData.find(d => d.rawProvince.includes('吉隆坡'));
-          } else if (featureName.includes('Pinang') || featureName.includes('槟城')) {
-            matchItem = allParsedData.find(d => d.rawProvince.includes('槟城'));
-          } else if (featureName.includes('Malacca') || featureName.includes('马六甲')) {
-            matchItem = allParsedData.find(d => d.rawProvince.includes('马六甲'));
-          } else {
-            // 其他州按正常映射
-            const dictZh = myNameDict[featureName] ? myNameDict[featureName].zh : '';
-            matchItem = allParsedData.find(d => d.rawProvince === featureName || d.rawProvince === dictZh);
-          }
-          
-          if (matchItem) {
+          // ★ 核心逻辑：如果 `done.json` 里有吉隆坡或槟城，就把雪兰莪（Selangor）强行染绿！
+          // 因为那个底图里只有雪兰莪，没有吉隆坡的独立轮廓
+          if ((klData || pgData) && featureName === 'Selangor') {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
           }
         });
 
@@ -217,7 +194,11 @@
               show: true, 
               fontSize: isMobile ? 8 : 10, 
               color: '#333',
-              formatter: function (params) { return getTranslatedName(params.name); }
+              formatter: function (params) { 
+                // 如果是雪兰莪，我们可以把标签显示为更直观的文字
+                if (params.name === 'Selangor' && (klData || pgData)) return '吉隆坡 / 槟城';
+                return myNameDict[params.name] ? myNameDict[params.name].zh : params.name; 
+              }
             }, 
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
             selectedMode: false, 
@@ -229,7 +210,7 @@
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图加载失败，请检查 Malaysia.json。';
+        document.getElementById('loading-tip').innerHTML = '加载失败：' + e.message;
       }
     }
 
@@ -238,7 +219,11 @@
       document.getElementById('back-btn').innerText = i18n[currentLang].back;
     }
 
-    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    async function initApp() { 
+      updateUI(); 
+      await fetchData(); 
+      renderMap(); 
+    }
     initApp();
 
     document.getElementById('lang-btn').addEventListener('click', async () => {
@@ -246,20 +231,30 @@
       updateUI(); await fetchData(); renderMap();
     });
 
+    // 悬浮与点击交互
     if (!isMobile) {
       let isOverBox = false; let hideTimer = null; let currentHoverName = null;
       myChart.on('mouseover', function (params) {
-        if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
-        clearTimeout(hideTimer); currentHoverName = params.name;
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
-        if (params.event && params.event.event) {
-          const e = params.event.event;
-          let x = e.clientX + 20; let y = e.clientY - 20;
-          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
-          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
-          if (y < 10) y = 10;
-          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+        if (params.name === 'Selangor' && (klData || pgData)) {
+          if (isOverBox || currentHoverName === params.name) return;
+          clearTimeout(hideTimer); currentHoverName = params.name;
+          
+          // 拼接上下两个信息
+          let combinedHtml = '';
+          if (klData) combinedHtml += buildItemHtml('吉隆坡', klData.author, klData.freeLink, klData.freeLevel, klData.paidLink, klData.paidLevel, klData.remark);
+          if (klData && pgData) combinedHtml += `<hr style="border:none; border-top:1px dashed #ccc; margin:10px 0;"/>`;
+          if (pgData) combinedHtml += buildItemHtml('槟城', pgData.author, pgData.freeLink, pgData.freeLevel, pgData.paidLink, pgData.paidLevel, pgData.remark);
+
+          tooltipEl.innerHTML = combinedHtml;
+          tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+          if (params.event && params.event.event) {
+            const e = params.event.event;
+            let x = e.clientX + 20; let y = e.clientY - 20;
+            if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+            if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+            if (y < 10) y = 10;
+            tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+          }
         }
       });
       myChart.on('mouseout', function () {
@@ -270,8 +265,13 @@
     }
 
     myChart.on('click', function(params) {
-      if (isMobile && provinceDataMap[params.name]) {
-        tooltipEl.innerHTML = provinceDataMap[params.name];
+      if (isMobile && params.name === 'Selangor' && (klData || pgData)) {
+        let combinedHtml = '';
+        if (klData) combinedHtml += buildItemHtml('吉隆坡', klData.author, klData.freeLink, klData.freeLevel, klData.paidLink, klData.paidLevel, klData.remark);
+        if (klData && pgData) combinedHtml += `<hr style="border:none; border-top:1px dashed #ccc; margin:10px 0;"/>`;
+        if (pgData) combinedHtml += buildItemHtml('槟城', pgData.author, pgData.freeLink, pgData.freeLevel, pgData.paidLink, pgData.paidLevel, pgData.remark);
+        
+        tooltipEl.innerHTML = combinedHtml;
         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
       }
