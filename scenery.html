@@ -5,8 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="referrer" content="no-referrer" />
   <title>全球地景 - HorizonSimLabs</title>
-  
-  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <link rel="icon" href="HorizonSimLabs.png" type="image/png">
+  <!-- ★ 核心修复 1：ECharts 库双 CDN 容错 -->
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script>
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
@@ -22,7 +28,7 @@
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
 
-    /* 悬浮国家列表菜单 */
+    /* 右侧菜单 */
     #country-menu {
       position: fixed; top: 70px; right: 15px;
       background: rgba(30, 41, 59, 0.9); backdrop-filter: blur(10px);
@@ -33,9 +39,7 @@
     }
     #country-menu::-webkit-scrollbar { width: 4px; }
     #country-menu::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
-    
     .menu-title { color: #94a3b8; font-size: 0.8rem; margin-bottom: 5px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
-    
     .country-item {
       display: flex; justify-content: space-between; align-items: center;
       padding: 8px 12px; background: rgba(255,255,255,0.05);
@@ -46,18 +50,18 @@
     .country-item::after { content: '→'; color: #94a3b8; }
     .country-item:hover::after { color: #fff; }
     
-    /* 手机端稍微调整一下菜单大小 */
-    @media (max-width: 768px) {
-      #country-menu { top: 70px; right: 10px; padding: 10px; min-width: 120px; }
-      .country-item { padding: 6px 10px; font-size: 0.85rem; }
+    /* 加载提示 */
+    #loading-tip {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      color: #64748b; font-size: 16px; z-index: 1;
     }
   </style>
 </head>
 <body>
+  <div id="loading-tip">正在加载世界地图数据...</div>
   <a href="./index.html" id="back-btn" class="ui-btn">← 返回主页</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   
-  <!-- 国家跳转菜单 -->
   <div id="country-menu">
     <div class="menu-title">已开放地景</div>
   </div>
@@ -78,37 +82,7 @@
       "France": "法国", "Germany": "德国", "Australia": "澳大利亚", "Canada": "加拿大",
       "Russia": "俄罗斯", "Brazil": "巴西", "Korea": "韩国", "South Korea": "韩国", 
       "Dem. Rep. Korea": "朝鲜", "North Korea": "朝鲜", "Denmark": "丹麦", 
-      "Singapore": "新加坡", "Thailand": "泰国", "Italy": "意大利", "Spain": "西班牙",
-      "Malaysia": "马来西亚", "Indonesia": "印度尼西亚", "Philippines": "菲律宾", "Vietnam": "越南",
-      "New Zealand": "新西兰", "Switzerland": "瑞士", "Netherlands": "荷兰", "Sweden": "瑞典",
-      "Norway": "挪威", "Finland": "芬兰", "Poland": "波兰", "Turkey": "土耳其",
-      "United Arab Emirates": "阿联酋", "South Africa": "南非", "Argentina": "阿根廷", "Mexico": "墨西哥",
-      "India": "印度", "Pakistan": "巴基斯坦", "Bangladesh": "孟加拉国", "Sri Lanka": "斯里兰卡",
-      "Nepal": "尼泊尔", "Bhutan": "不丹", "Mongolia": "蒙古", "Kazakhstan": "哈萨克斯坦",
-      "Uzbekistan": "乌兹别克斯坦", "Turkmenistan": "土库曼斯坦", "Kyrgyzstan": "吉尔吉斯斯坦",
-      "Tajikistan": "塔吉克斯坦", "Afghanistan": "阿富汗", "Iran": "伊朗", "Iraq": "伊拉克",
-      "Saudi Arabia": "沙特阿拉伯", "Kuwait": "科威特", "Qatar": "卡塔尔", "Oman": "阿曼",
-      "Yemen": "也门", "Jordan": "约旦", "Israel": "以色列", "Lebanon": "黎巴嫩", "Syria": "叙利亚",
-      "Egypt": "埃及", "Libya": "利比亚", "Tunisia": "突尼斯", "Algeria": "阿尔及利亚",
-      "Morocco": "摩洛哥", "Sudan": "苏丹", "Ethiopia": "埃塞俄比亚", "Kenya": "肯尼亚",
-      "Tanzania": "坦桑尼亚", "Nigeria": "尼日利亚", "Ghana": "加纳", "Angola": "安哥拉",
-      "Zambia": "赞比亚", "Zimbabwe": "津巴布韦", "Mozambique": "莫桑比克", "Madagascar": "马达加斯加",
-      "Chile": "智利", "Peru": "秘鲁", "Colombia": "哥伦比亚", "Venezuela": "委内瑞拉",
-      "Ecuador": "厄瓜多尔", "Bolivia": "玻利维亚", "Paraguay": "巴拉圭", "Uruguay": "乌拉圭",
-      "Cuba": "古巴", "Haiti": "海地", "Dominican Republic": "多米尼加", "Guatemala": "危地马拉",
-      "Honduras": "洪都拉斯", "El Salvador": "萨尔瓦多", "Nicaragua": "尼加拉瓜", "Costa Rica": "哥斯达黎加",
-      "Panama": "巴拿马", "Portugal": "葡萄牙", "Greece": "希腊", "Ireland": "爱尔兰",
-      "Belgium": "比利时", "Austria": "奥地利", "Czechia": "捷克", "Hungary": "匈牙利",
-      "Romania": "罗马尼亚", "Bulgaria": "保加利亚", "Ukraine": "乌克兰", "Belarus": "白俄罗斯",
-      "Iceland": "冰岛", "Croatia": "克罗地亚", "Serbia": "塞尔维亚", "Slovakia": "斯洛伐克",
-      "Slovenia": "斯洛文尼亚", "Lithuania": "立陶宛", "Latvia": "拉脱维亚", "Estonia": "爱沙尼亚",
-      "Georgia": "格鲁吉亚", "Armenia": "亚美尼亚", "Azerbaijan": "阿塞拜疆", "Cyprus": "塞浦路斯",
-      "Malta": "马耳他", "Luxembourg": "卢森堡", "Papua New Guinea": "巴布亚新几内亚",
-      "Fiji": "斐济", "Solomon Islands": "所罗门群岛", "Vanuatu": "瓦努阿图", "Samoa": "萨摩亚",
-      "Tonga": "汤加", "Kiribati": "基里巴斯", "Tuvalu": "图瓦卢", "Palau": "帕劳",
-      "Marshall Islands": "马绍尔群岛", "Micronesia": "密克罗尼西亚", "Nauru": "瑙鲁",
-      "Brunei": "文莱", "Timor-Leste": "东帝汶", "Cambodia": "柬埔寨", "Laos": "老挝",
-      "Myanmar": "缅甸", "Maldives": "马尔代夫", "Bahrain": "巴林"
+      "Singapore": "新加坡", "Thailand": "泰国", "Italy": "意大利", "Spain": "西班牙"
     };
 
     const countryReverse = {};
@@ -130,17 +104,13 @@
       document.getElementById('lang-btn').innerText = t.langBtn;
     }
 
-    // 生成右侧的快捷跳转菜单
     function renderMenu() {
       const menuEl = document.getElementById('country-menu');
       let html = `<div class="menu-title">${currentLang === 'zh' ? '已开放地景' : 'Available Scenery'}</div>`;
       
       for (let engName in validCountries) {
         const link = validCountries[engName];
-        const displayName = currentLang === 'zh' 
-          ? (countryTranslation[engName] || engName) 
-          : engName;
-        
+        const displayName = currentLang === 'zh' ? (countryTranslation[engName] || engName) : engName;
         html += `<a href="${link}" class="country-item"><span>${displayName}</span></a>`;
       }
       
@@ -150,9 +120,11 @@
 
     async function loadMap() {
       myChart.showLoading();
+      document.getElementById('loading-tip').style.display = 'block';
       const t = i18n[currentLang];
       for (let k in validCountries) delete validCountries[k];
 
+      // 1. 读取 global.json 数据
       try {
         let res = await fetch('./global.json?t=' + new Date().getTime());
         if (res.ok) {
@@ -170,11 +142,11 @@
             if (link) validCountries[engName] = link;
           });
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { console.error("读取 global.json 失败", e); }
 
-      // 地图数据加载（国内双保险 CDN）
+      // ★ 核心修复 2：世界地图数据源双保险
       const mapUrls = [
-        'https://cdn.bootcdn.net/ajax/libs/echarts/4.9.0/map/json/world.json',
+        'https://unpkg.com/echarts@4.9.0/map/json/world.json',
         'https://cdn.jsdelivr.net/npm/echarts@4.9.0/map/json/world.json'
       ];
       
@@ -184,20 +156,21 @@
           const worldRes = await fetch(url);
           if (worldRes.ok) {
             worldJson = await worldRes.json();
-            break;
+            break; // 成功获取就跳出循环
           }
-        } catch (e) { console.warn("CDN请求失败，尝试下一个..."); }
+        } catch (e) { console.warn("尝试下一个 CDN 源..."); }
       }
 
       if (!worldJson) {
         myChart.hideLoading();
-        document.getElementById('map').innerHTML = '<div style="text-align:center;padding-top:20vh;color:#999;">地图数据加载失败，请检查网络。</div>';
+        document.getElementById('loading-tip').innerHTML = '地图数据加载失败，请刷新重试。';
+        document.getElementById('loading-tip').style.color = '#ef4444';
         return;
       }
 
+      // 2. 渲染地图
       try {
         echarts.registerMap('world', worldJson);
-        
         const features = worldJson.features.map(f => f.properties.name);
         const mapData = [];
         
@@ -208,6 +181,8 @@
         });
 
         myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
         myChart.setOption({
           tooltip: { 
             show: true, trigger: 'item',
@@ -226,9 +201,7 @@
               fontSize: isMobile ? 8 : 10, 
               color: '#333',
               formatter: function (params) {
-                if (currentLang === 'zh') {
-                  return countryTranslation[params.name] || params.name;
-                }
+                if (currentLang === 'zh') return countryTranslation[params.name] || params.name;
                 return params.name; 
               }
             }, 
@@ -240,12 +213,16 @@
         });
         
         renderMenu();
-        
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error("渲染地图失败", e);
+        document.getElementById('loading-tip').innerHTML = '地图渲染异常。';
+        document.getElementById('loading-tip').style.color = '#ef4444';
+      }
     }
 
     updateUI();
-    loadMap();
+    // 延迟 100ms 确保 DOM 完全加载
+    setTimeout(loadMap, 100);
 
     document.getElementById('lang-btn').addEventListener('click', () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
