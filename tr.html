@@ -10,300 +10,84 @@
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
-    #my-tooltip {
-      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
-      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
-    }
+    #my-tooltip { position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px; padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap; }
     .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
-    .ui-btn {
-      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
-      backdrop-filter: blur(10px); transition: 0.3s;
-    }
+    .ui-btn { position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none; backdrop-filter: blur(10px); transition: 0.3s; }
     .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
+    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
   </style>
 </head>
 <body>
+  <div id="loading-tip">正在加载土耳其地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
   <div id="my-tooltip"></div>
-
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     let currentLang = 'zh';
+    const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
+    
+    // 完整 81 个省中英对照
+    const trCityDict = { 'Adana': { zh: '阿达纳', en: 'Adana' }, 'Adıyaman': { zh: '阿德亚曼', en: 'Adıyaman' }, 'Afyonkarahisar': { zh: '阿菲永卡拉希萨尔', en: 'Afyonkarahisar' }, 'Ağrı': { zh: '阿勒', en: 'Ağrı' }, 'Aksaray': { zh: '阿克萨赖', en: 'Aksaray' }, 'Amasya': { zh: '阿马西亚', en: 'Amasya' }, 'Ankara': { zh: '安卡拉', en: 'Ankara' }, 'Antalya': { zh: '安塔利亚', en: 'Antalya' }, 'Ardahan': { zh: '阿尔达汉', en: 'Ardahan' }, 'Artvin': { zh: '阿尔特温', en: 'Artvin' }, 'Aydın': { zh: '艾登', en: 'Aydın' }, 'Balıkesir': { zh: '巴勒克埃西尔', en: 'Balıkesir' }, 'Bartın': { zh: '巴尔滕', en: 'Bartın' }, 'Batman': { zh: '巴特曼', en: 'Batman' }, 'Bayburt': { zh: '巴伊布尔特', en: 'Bayburt' }, 'Bilecik': { zh: '比莱吉克', en: 'Bilecik' }, 'Bingöl': { zh: '宾格尔', en: 'Bingöl' }, 'Bitlis': { zh: '比特利斯', en: 'Bitlis' }, 'Bolu': { zh: '博卢', en: 'Bolu' }, 'Burdur': { zh: '布尔杜尔', en: 'Burdur' }, 'Bursa': { zh: '布尔萨', en: 'Bursa' }, 'Çanakkale': { zh: '恰纳卡莱', en: 'Çanakkale' }, 'Çankırı': { zh: '昌克勒', en: 'Çankırı' }, 'Çorum': { zh: '乔鲁姆', en: 'Çorum' }, 'Denizli': { zh: '代尼兹利', en: 'Denizli' }, 'Diyarbakır': { zh: '迪亚巴克尔', en: 'Diyarbakır' }, 'Düzce': { zh: '迪兹杰', en: 'Düzce' }, 'Edirne': { zh: '埃迪尔内', en: 'Edirne' }, 'Elazığ': { zh: '埃拉泽', en: 'Elazığ' }, 'Erzincan': { zh: '埃尔津詹', en: 'Erzincan' }, 'Erzurum': { zh: '埃尔祖鲁姆', en: 'Erzurum' }, 'Eskişehir': { zh: '埃斯基谢希尔', en: 'Eskişehir' }, 'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 'Giresun': { zh: '吉雷松', en: 'Giresun' }, 'Gümüşhane': { zh: '居米什哈内', en: 'Gümüşhane' }, 'Hakkâri': { zh: '哈卡里', en: 'Hakkâri' }, 'Hatay': { zh: '哈塔伊', en: 'Hatay' }, 'Iğdır': { zh: '厄德尔', en: 'Iğdır' }, 'Isparta': { zh: '伊斯帕尔塔', en: 'Isparta' }, 'İstanbul': { zh: '伊斯坦布尔', en: 'Istanbul' }, 'İzmir': { zh: '伊兹密尔', en: 'Izmir' }, 'Kahramanmaraş': { zh: '卡赫拉曼马拉什', en: 'Kahramanmaraş' }, 'Karabük': { zh: '卡拉比克', en: 'Karabük' }, 'Karaman': { zh: '卡拉曼', en: 'Karaman' }, 'Kars': { zh: '卡尔斯', en: 'Kars' }, 'Kastamonu': { zh: '卡斯塔莫努', en: 'Kastamonu' }, 'Kayseri': { zh: '开塞利', en: 'Kayseri' }, 'Kırıkkale': { zh: '克勒克卡莱', en: 'Kırıkkale' }, 'Kırklareli': { zh: '克尔克拉雷利', en: 'Kırklareli' }, 'Kırşehir': { zh: '克尔谢希尔', en: 'Kırşehir' }, 'Kilis': { zh: '基利斯', en: 'Kilis' }, 'Kocaeli': { zh: '科贾埃利', en: 'Kocaeli' }, 'Konya': { zh: '科尼亚', en: 'Konya' }, 'Kütahya': { zh: '屈塔希亚', en: 'Kütahya' }, 'Malatya': { zh: '马拉蒂亚', en: 'Malatya' }, 'Manisa': { zh: '马尼萨', en: 'Manisa' }, 'Mardin': { zh: '马尔丁', en: 'Mardin' }, 'Mersin': { zh: '梅尔辛', en: 'Mersin' }, 'Muğla': { zh: '穆拉', en: 'Muğla' }, 'Muş': { zh: '穆什', en: 'Muş' }, 'Nevşehir': { zh: '内夫谢希尔', en: 'Nevşehir' }, 'Niğde': { zh: '尼代', en: 'Niğde' }, 'Ordu': { zh: '奥尔杜', en: 'Ordu' }, 'Osmaniye': { zh: '奥斯曼尼耶', en: 'Osmaniye' }, 'Rize': { zh: '里泽', en: 'Rize' }, 'Sakarya': { zh: '萨卡里亚', en: 'Sakarya' }, 'Samsun': { zh: '萨姆松', en: 'Samsun' }, 'Siirt': { zh: '锡尔特', en: 'Siirt' }, 'Sinop': { zh: '锡诺普', en: 'Sinop' }, 'Sivas': { zh: '锡瓦斯', en: 'Sivas' }, 'Şanlıurfa': { zh: '尚勒乌尔法', en: 'Şanlıurfa' }, 'Şırnak': { zh: '舍尔纳克', en: 'Şırnak' }, 'Tekirdağ': { zh: '泰基尔达', en: 'Tekirdağ' }, 'Tokat': { zh: '托卡特', en: 'Tokat' }, 'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 'Tunceli': { zh: '通杰利', en: 'Tunceli' }, 'Uşak': { zh: '乌沙克', en: 'Uşak' }, 'Van': { zh: '凡城', en: 'Van' }, 'Yalova': { zh: '亚洛瓦', en: 'Yalova' }, 'Yozgat': { zh: '约兹加特', en: 'Yozgat' }, 'Zonguldak': { zh: '宗古尔达克', en: 'Zonguldak' } };
 
-    const i18n = {
-      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
-      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
-    };
-
-    // ★ 土耳其真实 81 个省/城市中英对照（完整版）
-    const trCityDict = {
-      'Adana': { zh: '阿达纳', en: 'Adana' }, 'Adıyaman': { zh: '阿德亚曼', en: 'Adıyaman' },
-      'Afyonkarahisar': { zh: '阿菲永卡拉希萨尔', en: 'Afyonkarahisar' }, 'Ağrı': { zh: '阿勒', en: 'Ağrı' },
-      'Aksaray': { zh: '阿克萨赖', en: 'Aksaray' }, 'Amasya': { zh: '阿马西亚', en: 'Amasya' },
-      'Ankara': { zh: '安卡拉', en: 'Ankara' }, 'Antalya': { zh: '安塔利亚', en: 'Antalya' },
-      'Ardahan': { zh: '阿尔达汉', en: 'Ardahan' }, 'Artvin': { zh: '阿尔特温', en: 'Artvin' },
-      'Aydın': { zh: '艾登', en: 'Aydın' }, 'Balıkesir': { zh: '巴勒克埃西尔', en: 'Balıkesir' },
-      'Bartın': { zh: '巴尔滕', en: 'Bartın' }, 'Batman': { zh: '巴特曼', en: 'Batman' },
-      'Bayburt': { zh: '巴伊布尔特', en: 'Bayburt' }, 'Bilecik': { zh: '比莱吉克', en: 'Bilecik' },
-      'Bingöl': { zh: '宾格尔', en: 'Bingöl' }, 'Bitlis': { zh: '比特利斯', en: 'Bitlis' },
-      'Bolu': { zh: '博卢', en: 'Bolu' }, 'Burdur': { zh: '布尔杜尔', en: 'Burdur' },
-      'Bursa': { zh: '布尔萨', en: 'Bursa' }, 'Çanakkale': { zh: '恰纳卡莱', en: 'Çanakkale' },
-      'Çankırı': { zh: '昌克勒', en: 'Çankırı' }, 'Çorum': { zh: '乔鲁姆', en: 'Çorum' },
-      'Denizli': { zh: '代尼兹利', en: 'Denizli' }, 'Diyarbakır': { zh: '迪亚巴克尔', en: 'Diyarbakır' },
-      'Düzce': { zh: '迪兹杰', en: 'Düzce' }, 'Edirne': { zh: '埃迪尔内', en: 'Edirne' },
-      'Elazığ': { zh: '埃拉泽', en: 'Elazığ' }, 'Erzincan': { zh: '埃尔津詹', en: 'Erzincan' },
-      'Erzurum': { zh: '埃尔祖鲁姆', en: 'Erzurum' }, 'Eskişehir': { zh: '埃斯基谢希尔', en: 'Eskişehir' },
-      'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 'Giresun': { zh: '吉雷松', en: 'Giresun' },
-      'Gümüşhane': { zh: '居米什哈内', en: 'Gümüşhane' }, 'Hakkâri': { zh: '哈卡里', en: 'Hakkâri' },
-      'Hatay': { zh: '哈塔伊', en: 'Hatay' }, 'Iğdır': { zh: '厄德尔', en: 'Iğdır' },
-      'Isparta': { zh: '伊斯帕尔塔', en: 'Isparta' }, 'İstanbul': { zh: '伊斯坦布尔', en: 'Istanbul' },
-      'İzmir': { zh: '伊兹密尔', en: 'Izmir' }, 'Kahramanmaraş': { zh: '卡赫拉曼马拉什', en: 'Kahramanmaraş' },
-      'Karabük': { zh: '卡拉比克', en: 'Karabük' }, 'Karaman': { zh: '卡拉曼', en: 'Karaman' },
-      'Kars': { zh: '卡尔斯', en: 'Kars' }, 'Kastamonu': { zh: '卡斯塔莫努', en: 'Kastamonu' },
-      'Kayseri': { zh: '开塞利', en: 'Kayseri' }, 'Kırıkkale': { zh: '克勒克卡莱', en: 'Kırıkkale' },
-      'Kırklareli': { zh: '克尔克拉雷利', en: 'Kırklareli' }, 'Kırşehir': { zh: '克尔谢希尔', en: 'Kırşehir' },
-      'Kilis': { zh: '基利斯', en: 'Kilis' }, 'Kocaeli': { zh: '科贾埃利', en: 'Kocaeli' },
-      'Konya': { zh: '科尼亚', en: 'Konya' }, 'Kütahya': { zh: '屈塔希亚', en: 'Kütahya' },
-      'Malatya': { zh: '马拉蒂亚', en: 'Malatya' }, 'Manisa': { zh: '马尼萨', en: 'Manisa' },
-      'Mardin': { zh: '马尔丁', en: 'Mardin' }, 'Mersin': { zh: '梅尔辛', en: 'Mersin' },
-      'Muğla': { zh: '穆拉', en: 'Muğla' }, 'Muş': { zh: '穆什', en: 'Muş' },
-      'Nevşehir': { zh: '内夫谢希尔', en: 'Nevşehir' }, 'Niğde': { zh: '尼代', en: 'Niğde' },
-      'Ordu': { zh: '奥尔杜', en: 'Ordu' }, 'Osmaniye': { zh: '奥斯曼尼耶', en: 'Osmaniye' },
-      'Rize': { zh: '里泽', en: 'Rize' }, 'Sakarya': { zh: '萨卡里亚', en: 'Sakarya' },
-      'Samsun': { zh: '萨姆松', en: 'Samsun' }, 'Siirt': { zh: '锡尔特', en: 'Siirt' },
-      'Sinop': { zh: '锡诺普', en: 'Sinop' }, 'Sivas': { zh: '锡瓦斯', en: 'Sivas' },
-      'Şanlıurfa': { zh: '尚勒乌尔法', en: 'Şanlıurfa' }, 'Şırnak': { zh: '舍尔纳克', en: 'Şırnak' },
-      'Tekirdağ': { zh: '泰基尔达', en: 'Tekirdağ' }, 'Tokat': { zh: '托卡特', en: 'Tokat' },
-      'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 'Tunceli': { zh: '通杰利', en: 'Tunceli' },
-      'Uşak': { zh: '乌沙克', en: 'Uşak' }, 'Van': { zh: '凡城', en: 'Van' },
-      'Yalova': { zh: '亚洛瓦', en: 'Yalova' }, 'Yozgat': { zh: '约兹加特', en: 'Yozgat' },
-      'Zonguldak': { zh: '宗古尔达克', en: 'Zonguldak' }
-    };
-
-    // 因为土耳其数据太大，这里使用官方的极简真实省界数据源做双重保护
-    const trGeoJsonUrl = 'https://fastly.jsdelivr.net/gh/cihadturhan/geojson-turkey@master/tr-cities-utf8.json';
-
-    function getTranslatedName(rawName) {
-      if (trCityDict[rawName]) {
-        return currentLang === 'zh' ? trCityDict[rawName].zh : trCityDict[rawName].en;
-      }
-      return rawName;
-    }
-
-    function parseBilingual(text) {
-      if (!text) return '';
-      const parts = text.split('|');
-      if (currentLang === 'zh') return parts[0].trim();
-      return (parts[1] || parts[0]).trim();
-    }
-
+    function getTranslatedName(rawName) { if (trCityDict[rawName]) return currentLang === 'zh' ? trCityDict[rawName].zh : trCityDict[rawName].en; return rawName; }
+    function parseBilingual(text) { if (!text) return ''; const parts = text.split('|'); return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim(); }
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
-      const t = i18n[currentLang];
-      const displayAuthor = parseBilingual(author);
-      const displayFreeLevel = parseBilingual(freeLevel);
-      const displayPaidLevel = parseBilingual(paidLevel);
-      const displayRemark = parseBilingual(remark);
-      const parsedFreeLink = parseBilingual(freeLink);
-      const parsedPaidLink = parseBilingual(paidLink);
-      
+      const t = i18n[currentLang]; const displayAuthor = parseBilingual(author); const displayFreeLevel = parseBilingual(freeLevel); const displayPaidLevel = parseBilingual(paidLevel); const displayRemark = parseBilingual(remark); const parsedFreeLink = parseBilingual(freeLink); const parsedPaidLink = parseBilingual(paidLink);
       const titleName = getTranslatedName(rawProvince);
-
       let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
-      html += `<div>${t.download}</div>`;
-      
-      function formatLink(link) {
-        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
-        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
-        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
-      }
-
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
+      function formatLink(link) { if (!link || link === '无' || link === 'None') return t.noLink; if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`; return `<span style="color:#333; font-weight:bold;">${link}</span>`; }
       if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
       if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
-      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
-      
-      return html;
+      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`; return html;
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let allParsedData = []; 
-    const provinceDataMap = {};
+    let allParsedData = []; const provinceDataMap = {};
 
     async function fetchData() {
-      allParsedData = [];
-      const t = i18n[currentLang];
-      try {
-        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
-        if (doneRes.ok) {
-          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
-          text.split(',').forEach(line => {
-            let rawLine = line.trim().replace(/；/g, ';');
-            if (!rawLine) return;
-            const parts = rawLine.split(';');
-            const rawProvince = parts[0].trim();
-            allParsedData.push({
-              rawProvince: rawProvince,
-              author: parts[1] || t.unknown,
-              freeLink: parts[2] || '',
-              freeLevel: parts[3] || '',
-              paidLink: parts[4] || '',
-              paidLevel: parts[5] || '',
-              remark: parts[6] || ''
-            });
-          });
-        }
-      } catch (e) { console.error("读取 done.json 失败", e); }
+      allParsedData = []; const t = i18n[currentLang];
+      try { let doneRes = await fetch('./done.json?t=' + new Date().getTime()); if (doneRes.ok) { let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim(); text.split(',').forEach(line => { let rawLine = line.trim().replace(/；/g, ';'); if (!rawLine) return; const parts = rawLine.split(';'); allParsedData.push({ rawProvince: parts[0].trim(), author: parts[1] || t.unknown, freeLink: parts[2] || '', freeLevel: parts[3] || '', paidLink: parts[4] || '', paidLevel: parts[5] || '', remark: parts[6] || '' }); }); } } catch (e) { }
     }
 
     async function renderMap() {
       myChart.showLoading();
       try {
-        const trRes = await fetch(trGeoJsonUrl);
-        const realTrGeoJson = await trRes.json();
-
-        echarts.registerMap('turkey', realTrGeoJson);
+        const res = await fetch('https://cdn.jsdelivr.net/npm/echarts-countries-js@1.0.5/echarts-countries-js/Turkey.min.js');
+        const text = await res.text(); const start = text.indexOf('{'); const end = text.lastIndexOf('}');
+        const realGeoJson = JSON.parse(text.substring(start, end + 1));
+        echarts.registerMap('turkey', realGeoJson);
         
-        const features = realTrGeoJson.features.map(f => f.properties.name);
-        const mapData = [];
-        
+        const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
-
         features.forEach(featureName => {
           const matchItem = allParsedData.find(item => {
             const itemRaw = item.rawProvince;
-            
-            // 如果 JSON 写的是中文（比如“伊斯坦布尔”），去字典里查对应底图名（“İstanbul”）
-            for (let key in trCityDict) {
-              if (key === featureName) {
-                const dictZh = trCityDict[key].zh;
-                if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true;
-              }
-            }
-            // 如果写的是英文或底图原名
+            for (let key in trCityDict) { if (key === featureName) { const dictZh = trCityDict[key].zh; if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true; } }
             return itemRaw === featureName || featureName.includes(itemRaw) || itemRaw.includes(featureName);
           });
-          
-          if (matchItem) {
-            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
-          }
+          if (matchItem) { mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); }
         });
 
-        myChart.hideLoading();
-
-        myChart.setOption({
-          tooltip: { show: false },
-          series: [{
-            type: 'map',
-            map: 'turkey', 
-            roam: true,
-            zoom: 1.2,
-            label: { 
-              show: true, 
-              fontSize: isMobile ? 8 : 10, 
-              color: '#333',
-              formatter: function (params) {
-                return getTranslatedName(params.name);
-              }
-            }, 
-            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
-            selectedMode: false, 
-            emphasis: { itemStyle: { areaColor: 'inherit' } },
-            data: mapData
-          }]
-        });
-
-      } catch (e) {
-        console.error("地图加载失败", e);
-        myChart.hideLoading();
-        document.getElementById('map').innerHTML = '<div style="text-align:center;padding-top:20vh;color:#999;">地图加载失败，请检查网络。</div>';
-      }
+        myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
+        myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'turkey', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
+      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载失败，请检查网络'; }
     }
 
-    function updateUI() {
-      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
-      document.getElementById('back-btn').innerText = i18n[currentLang].back;
-    }
-
-    async function initApp() { updateUI(); await fetchData(); await renderMap(); }
-    initApp();
-
-    document.getElementById('lang-btn').addEventListener('click', async () => {
-      currentLang = currentLang === 'zh' ? 'en' : 'zh';
-      updateUI();
-      await fetchData();
-      await renderMap();
-    });
-
-    if (!isMobile) {
-      let isOverBox = false;
-      let hideTimer = null;
-      let currentHoverName = null;
-
-      myChart.on('mouseover', function (params) {
-        if (!provinceDataMap[params.name]) return;
-        if (isOverBox || currentHoverName === params.name) return;
-        
-        clearTimeout(hideTimer);
-        currentHoverName = params.name;
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.transform = 'none';
-        tooltipEl.style.bottom = 'auto';
-        tooltipEl.style.display = 'block';
-
-        if (params.event && params.event.event) {
-          const e = params.event.event;
-          let x = e.clientX + 20;
-          let y = e.clientY - 20;
-
-          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
-          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
-          if (y < 10) y = 10;
-
-          tooltipEl.style.left = x + 'px';
-          tooltipEl.style.top = y + 'px';
-        }
-      });
-
-      myChart.on('mouseout', function () {
-        hideTimer = setTimeout(() => {
-          if (!isOverBox) {
-            tooltipEl.style.display = 'none';
-            currentHoverName = null;
-          }
-        }, 300);
-      });
-
-      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
-      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
-    }
-
-    myChart.on('click', function(params) {
-      if (isMobile && provinceDataMap[params.name]) {
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.display = 'block';
-        tooltipEl.style.left = '50%';
-        tooltipEl.style.top = 'auto';
-        tooltipEl.style.bottom = '50px';
-        tooltipEl.style.transform = 'translateX(-50%)';
-      }
-    });
-    
-    myChart.getZr().on('click', function (event) {
-      if (isMobile && !event.target) tooltipEl.style.display = 'none';
-    });
-
+    function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
+    async function initApp() { updateUI(); await fetchData(); await renderMap(); } initApp();
+    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); await renderMap(); });
+    if (!isMobile) { let isOverBox = false; let hideTimer = null; let currentHoverName = null; myChart.on('mouseover', function (params) { if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return; clearTimeout(hideTimer); currentHoverName = params.name; tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block'; if (params.event && params.event.event) { const e = params.event.event; let x = e.clientX + 20; let y = e.clientY - 20; if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20; if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10; if (y < 10) y = 10; tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px'; } }); myChart.on('mouseout', function () { hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300); }); tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); }); tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; }); }
+    myChart.on('click', function(params) { if (isMobile && provinceDataMap[params.name]) { tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto'; tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)'; } });
+    myChart.getZr().on('click', function (event) { if (isMobile && !event.target) tooltipEl.style.display = 'none'; });
     window.addEventListener('resize', () => myChart.resize());
   </script>
 </body>
