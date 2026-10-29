@@ -10,19 +10,10 @@
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
-    #my-tooltip {
-      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
-      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
-    }
+    #my-tooltip { position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px; padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap; }
     .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
-    .ui-btn {
-      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
-      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
-      backdrop-filter: blur(10px); transition: 0.3s;
-    }
+    .ui-btn { position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none; backdrop-filter: blur(10px); transition: 0.3s; }
     .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
@@ -32,277 +23,74 @@
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在加载马来西亚州级地图...</div>
+  <div id="loading-tip">正在加载马来西亚地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
   <div id="my-tooltip"></div>
-
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     let currentLang = 'zh';
+    const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
+    
+    const myNameDict = { 'Johor': { zh: '柔佛', en: 'Johor' }, 'Kedah': { zh: '吉打', en: 'Kedah' }, 'Kelantan': { zh: '吉兰丹', en: 'Kelantan' }, 'Melaka': { zh: '马六甲', en: 'Melaka' }, 'Negeri Sembilan': { zh: '森美兰', en: 'Negeri Sembilan' }, 'Pahang': { zh: '彭亨', en: 'Pahang' }, 'Pulau Pinang': { zh: '槟城', en: 'Penang' }, 'Perak': { zh: '霹雳', en: 'Perak' }, 'Perlis': { zh: '玻璃市', en: 'Perlis' }, 'Selangor': { zh: '雪兰莪', en: 'Selangor' }, 'Terengganu': { zh: '登嘉楼', en: 'Terengganu' }, 'Sabah': { zh: '沙巴', en: 'Sabah' }, 'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' }, 'Labuan': { zh: '纳闽', en: 'Labuan' }, 'Putrajaya': { zh: '布城', en: 'Putrajaya' } };
+    const cityToState = { '槟城': 'Pulau Pinang', '吉隆坡': 'Kuala Lumpur', 'KL': 'Kuala Lumpur', '新山': 'Johor', '亚庇': 'Sabah', '古晋': 'Sarawak', '怡保': 'Perak', '莎阿南': 'Selangor' };
 
-    const i18n = {
-      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
-      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
-    };
-
-    // 马来西亚州属中英翻译字典
-    const myNameDict = {
-      'Johor': { zh: '柔佛', en: 'Johor' },
-      'Kedah': { zh: '吉打', en: 'Kedah' },
-      'Kelantan': { zh: '吉兰丹', en: 'Kelantan' },
-      'Melaka': { zh: '马六甲', en: 'Melaka' },
-      'Negeri Sembilan': { zh: '森美兰', en: 'Negeri Sembilan' },
-      'Pahang': { zh: '彭亨', en: 'Pahang' },
-      'Pulau Pinang': { zh: '槟城', en: 'Penang' },
-      'Perak': { zh: '霹雳', en: 'Perak' },
-      'Perlis': { zh: '玻璃市', en: 'Perlis' },
-      'Selangor': { zh: '雪兰莪', en: 'Selangor' },
-      'Terengganu': { zh: '登嘉楼', en: 'Terengganu' },
-      'Sabah': { zh: '沙巴', en: 'Sabah' },
-      'Sarawak': { zh: '砂拉越', en: 'Sarawak' },
-      'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
-      'Labuan': { zh: '纳闽', en: 'Labuan' },
-      'Putrajaya': { zh: '布城', en: 'Putrajaya' }
-    };
-
-    // 城市/常用名 映射到州属（方便写 "槟城" 或 "KL"）
-    const cityToState = {
-      '槟城': 'Pulau Pinang',
-      '吉隆坡': 'Kuala Lumpur',
-      'KL': 'Kuala Lumpur',
-      '新山': 'Johor',
-      '亚庇': 'Sabah',
-      '古晋': 'Sarawak',
-      '怡保': 'Perak',
-      '莎阿南': 'Selangor'
-    };
-
-    function getTranslatedName(rawName) {
-      if (myNameDict[rawName]) {
-        return currentLang === 'zh' ? myNameDict[rawName].zh : myNameDict[rawName].en;
-      }
-      return rawName;
-    }
-
-    function parseBilingual(text) {
-      if (!text) return '';
-      const parts = text.split('|');
-      if (currentLang === 'zh') return parts[0].trim();
-      return (parts[1] || parts[0]).trim();
-    }
-
+    function getTranslatedName(rawName) { if (myNameDict[rawName]) return currentLang === 'zh' ? myNameDict[rawName].zh : myNameDict[rawName].en; return rawName; }
+    function parseBilingual(text) { if (!text) return ''; const parts = text.split('|'); return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim(); }
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
-      const t = i18n[currentLang];
-      const displayAuthor = parseBilingual(author);
-      const displayFreeLevel = parseBilingual(freeLevel);
-      const displayPaidLevel = parseBilingual(paidLevel);
-      const displayRemark = parseBilingual(remark);
-      const parsedFreeLink = parseBilingual(freeLink);
-      const parsedPaidLink = parseBilingual(paidLink);
-      
-      // 标题：如果写的是城市，显示对应的州名
-      let titleRaw = rawProvince;
-      if (cityToState[rawProvince]) titleRaw = cityToState[rawProvince];
-      const titleName = getTranslatedName(titleRaw) || rawProvince;
-
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      if (rawProvince !== titleRaw) {
-        html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
-      }
-      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
-      html += `<div>${t.download}</div>`;
-      
-      function formatLink(link) {
-        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
-        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
-        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
-      }
-
+      const t = i18n[currentLang]; const displayAuthor = parseBilingual(author); const displayFreeLevel = parseBilingual(freeLevel); const displayPaidLevel = parseBilingual(paidLevel); const displayRemark = parseBilingual(remark); const parsedFreeLink = parseBilingual(freeLink); const parsedPaidLink = parseBilingual(paidLink);
+      let titleRaw = rawProvince; if (cityToState[rawProvince]) titleRaw = cityToState[rawProvince]; const titleName = getTranslatedName(titleRaw) || rawProvince;
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`; if (rawProvince !== titleRaw) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
+      function formatLink(link) { if (!link || link === '无' || link === 'None') return t.noLink; if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`; return `<span style="color:#333; font-weight:bold;">${link}</span>`; }
       if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
       if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
-      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
-      
-      return html;
+      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`; return html;
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let allParsedData = []; 
-    const provinceDataMap = {};
+    let allParsedData = []; const provinceDataMap = {};
 
     async function fetchData() {
-      allParsedData = [];
-      const t = i18n[currentLang];
-      try {
-        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
-        if (doneRes.ok) {
-          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
-          text.split(',').forEach(line => {
-            let rawLine = line.trim().replace(/；/g, ';');
-            if (!rawLine) return;
-            const parts = rawLine.split(';');
-            const rawProvince = parts[0].trim();
-            allParsedData.push({
-              rawProvince: rawProvince,
-              author: parts[1] || t.unknown,
-              freeLink: parts[2] || '',
-              freeLevel: parts[3] || '',
-              paidLink: parts[4] || '',
-              paidLevel: parts[5] || '',
-              remark: parts[6] || ''
-            });
-          });
-        }
-      } catch (e) { console.error("读取 done.json 失败", e); }
+      allParsedData = []; const t = i18n[currentLang];
+      try { let doneRes = await fetch('./done.json?t=' + new Date().getTime()); if (doneRes.ok) { let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim(); text.split(',').forEach(line => { let rawLine = line.trim().replace(/；/g, ';'); if (!rawLine) return; const parts = rawLine.split(';'); allParsedData.push({ rawProvince: parts[0].trim(), author: parts[1] || t.unknown, freeLink: parts[2] || '', freeLevel: parts[3] || '', paidLink: parts[4] || '', paidLevel: parts[5] || '', remark: parts[6] || '' }); }); } } catch (e) { }
     }
 
     async function renderMap() {
       myChart.showLoading();
       try {
-        // 通过 jsDelivr 加载 echarts-countries-js 里的马来西亚地图数据
-        const myRes = await fetch('https://fastly.jsdelivr.net/gh/pyecharts/echarts-countries-js@master/echarts-countries-js/Malaysia.js');
-        const jsText = await myRes.text();
-        const startIdx = jsText.indexOf('{');
-        const endIdx = jsText.lastIndexOf('}');
-        const geoJsonStr = jsText.substring(startIdx, endIdx + 1);
-        const realMyGeoJson = JSON.parse(geoJsonStr);
-
-        echarts.registerMap('malaysia', realMyGeoJson);
+        const res = await fetch('https://cdn.jsdelivr.net/npm/echarts-countries-js@1.0.5/echarts-countries-js/Malaysia.min.js');
+        const text = await res.text(); const start = text.indexOf('{'); const end = text.lastIndexOf('}');
+        const realGeoJson = JSON.parse(text.substring(start, end + 1));
+        echarts.registerMap('malaysia', realGeoJson);
         
-        const features = realMyGeoJson.features.map(f => f.properties.name);
-        const mapData = [];
-        
+        const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
-
         features.forEach(featureName => {
           const matchItem = allParsedData.find(item => {
             const itemRaw = item.rawProvince;
-            
-            // 如果 JSON 写的是城市，映射到对应的州
             if (cityToState[itemRaw] === featureName) return true;
-            
-            // 如果 JSON 写的是州名（中英文都行）
             const dictZh = myNameDict[featureName] ? myNameDict[featureName].zh : '';
             if (itemRaw === featureName || itemRaw === dictZh) return true;
             if (dictZh && (itemRaw.includes(dictZh) || dictZh.includes(itemRaw))) return true;
-            
             return false;
           });
-          
-          if (matchItem) {
-            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
-          }
+          if (matchItem) { mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); }
         });
 
-        myChart.hideLoading();
-        document.getElementById('loading-tip').style.display = 'none';
-
-        myChart.setOption({
-          tooltip: { show: false },
-          series: [{
-            type: 'map',
-            map: 'malaysia', 
-            roam: true,
-            zoom: 1.2,
-            label: { 
-              show: true, 
-              fontSize: isMobile ? 8 : 10, 
-              color: '#333',
-              formatter: function (params) {
-                return getTranslatedName(params.name);
-              }
-            }, 
-            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
-            selectedMode: false, 
-            emphasis: { itemStyle: { areaColor: 'inherit' } },
-            data: mapData
-          }]
-        });
-
-      } catch (e) {
-        console.error("地图加载失败", e);
-        myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图数据加载失败，请检查网络。';
-        document.getElementById('loading-tip').style.color = '#ef4444';
-      }
+        myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
+        myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'malaysia', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
+      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载失败，请检查网络'; }
     }
 
-    function updateUI() {
-      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
-      document.getElementById('back-btn').innerText = i18n[currentLang].back;
-    }
-
-    async function initApp() { updateUI(); await fetchData(); await renderMap(); }
-    initApp();
-
-    document.getElementById('lang-btn').addEventListener('click', async () => {
-      currentLang = currentLang === 'zh' ? 'en' : 'zh';
-      updateUI();
-      await fetchData();
-      await renderMap();
-    });
-
-    if (!isMobile) {
-      let isOverBox = false;
-      let hideTimer = null;
-      let currentHoverName = null;
-
-      myChart.on('mouseover', function (params) {
-        if (!provinceDataMap[params.name]) return;
-        if (isOverBox || currentHoverName === params.name) return;
-        
-        clearTimeout(hideTimer);
-        currentHoverName = params.name;
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.transform = 'none';
-        tooltipEl.style.bottom = 'auto';
-        tooltipEl.style.display = 'block';
-
-        if (params.event && params.event.event) {
-          const e = params.event.event;
-          let x = e.clientX + 20;
-          let y = e.clientY - 20;
-
-          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
-          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
-          if (y < 10) y = 10;
-
-          tooltipEl.style.left = x + 'px';
-          tooltipEl.style.top = y + 'px';
-        }
-      });
-
-      myChart.on('mouseout', function () {
-        hideTimer = setTimeout(() => {
-          if (!isOverBox) {
-            tooltipEl.style.display = 'none';
-            currentHoverName = null;
-          }
-        }, 300);
-      });
-
-      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
-      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
-    }
-
-    myChart.on('click', function(params) {
-      if (isMobile && provinceDataMap[params.name]) {
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.display = 'block';
-        tooltipEl.style.left = '50%';
-        tooltipEl.style.top = 'auto';
-        tooltipEl.style.bottom = '50px';
-        tooltipEl.style.transform = 'translateX(-50%)';
-      }
-    });
-    
-    myChart.getZr().on('click', function (event) {
-      if (isMobile && !event.target) tooltipEl.style.display = 'none';
-    });
-
+    function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
+    async function initApp() { updateUI(); await fetchData(); await renderMap(); } initApp();
+    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); await renderMap(); });
+    if (!isMobile) { let isOverBox = false; let hideTimer = null; let currentHoverName = null; myChart.on('mouseover', function (params) { if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return; clearTimeout(hideTimer); currentHoverName = params.name; tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block'; if (params.event && params.event.event) { const e = params.event.event; let x = e.clientX + 20; let y = e.clientY - 20; if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20; if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10; if (y < 10) y = 10; tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px'; } }); myChart.on('mouseout', function () { hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300); }); tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); }); tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; }); }
+    myChart.on('click', function(params) { if (isMobile && provinceDataMap[params.name]) { tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto'; tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)'; } });
+    myChart.getZr().on('click', function (event) { if (isMobile && !event.target) tooltipEl.style.display = 'none'; });
     window.addEventListener('resize', () => myChart.resize());
   </script>
 </body>
