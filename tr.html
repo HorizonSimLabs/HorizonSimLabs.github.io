@@ -10,10 +10,19 @@
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
-    #my-tooltip { position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px; padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333; box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap; }
+    #my-tooltip {
+      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
+      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
+    }
     .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
-    .ui-btn { position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none; backdrop-filter: blur(10px); transition: 0.3s; }
+    .ui-btn {
+      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
+      backdrop-filter: blur(10px); transition: 0.3s;
+    }
     .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
@@ -28,96 +37,220 @@
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
   <div id="my-tooltip"></div>
+
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     let currentLang = 'zh';
 
-    const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
-    
-    // ★ 彻底解决土耳其语特殊字符和拼写问题
-    const trNameDict = { 
-      'İstanbul': { zh: '伊斯坦布尔', en: 'Istanbul' }, 
-      'Istanbul': { zh: '伊斯坦布尔', en: 'Istanbul' },
-      'Ankara': { zh: '安卡拉', en: 'Ankara' }, 
-      'İzmir': { zh: '伊兹密尔', en: 'Izmir' }, 
-      'Izmir': { zh: '伊兹密尔', en: 'Izmir' }, 
-      'Antalya': { zh: '安塔利亚', en: 'Antalya' }, 
-      'Bursa': { zh: '布尔萨', en: 'Bursa' }, 
-      'Adana': { zh: '阿达纳', en: 'Adana' }, 
-      'Konya': { zh: '科尼亚', en: 'Konya' }, 
-      'Gaziantep': { zh: '加济安泰普', en: 'Gaziantep' }, 
-      'Trabzon': { zh: '特拉布宗', en: 'Trabzon' }, 
-      'Nevşehir': { zh: '内夫谢希尔', en: 'Nevsehir' } 
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
     };
 
-    function getTranslatedName(rawName) { if (trNameDict[rawName]) return currentLang === 'zh' ? trNameDict[rawName].zh : trNameDict[rawName].en; return rawName; }
-    function parseBilingual(text) { if (!text) return ''; const parts = text.split('|'); return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim(); }
+    // 土耳其 7 大区中英对照
+    const regionNameDict = {
+      'Marmara Region': { zh: '马尔马拉大区', en: 'Marmara' },
+      'Black Sea Region': { zh: '黑海大区', en: 'Black Sea' },
+      'Central Anatolia Region': { zh: '中安纳托利亚大区', en: 'Central Anatolia' },
+      'Eastern Anatolia Region': { zh: '东安纳托利亚大区', en: 'Eastern Anatolia' },
+      'Southeastern Anatolia Region': { zh: '东南安纳托利亚大区', en: 'Southeastern Anatolia' },
+      'Aegean Region': { zh: '爱琴海大区', en: 'Aegean' },
+      'Mediterranean Region': { zh: '地中海大区', en: 'Mediterranean' }
+    };
+
+    // 城市/省份归属到哪个大区
+    const cityToRegion = {
+      '伊斯坦布尔': 'Marmara Region', 'Istanbul': 'Marmara Region', 'İstanbul': 'Marmara Region',
+      '布尔萨': 'Marmara Region', 'Bursa': 'Marmara Region',
+      '安卡拉': 'Central Anatolia Region', 'Ankara': 'Central Anatolia Region',
+      '科尼亚': 'Central Anatolia Region', 'Konya': 'Central Anatolia Region',
+      '伊兹密尔': 'Aegean Region', 'Izmir': 'Aegean Region', 'İzmir': 'Aegean Region',
+      '安塔利亚': 'Mediterranean Region', 'Antalya': 'Mediterranean Region',
+      '阿达纳': 'Mediterranean Region', 'Adana': 'Mediterranean Region',
+      '特拉布宗': 'Black Sea Region', 'Trabzon': 'Black Sea Region',
+      '加济安泰普': 'Southeastern Anatolia Region', 'Gaziantep': 'Southeastern Anatolia Region',
+      '凡城': 'Eastern Anatolia Region', 'Van': 'Eastern Anatolia Region',
+      '内夫谢希尔': 'Central Anatolia Region', 'Nevşehir': 'Central Anatolia Region'
+    };
+
+    function getTranslatedName(rawName) {
+      if (regionNameDict[rawName]) return currentLang === 'zh' ? regionNameDict[rawName].zh : regionNameDict[rawName].en;
+      return rawName;
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim();
+    }
+
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
-      const t = i18n[currentLang]; const displayAuthor = parseBilingual(author); const displayFreeLevel = parseBilingual(freeLevel); const displayPaidLevel = parseBilingual(paidLevel); const displayRemark = parseBilingual(remark); const parsedFreeLink = parseBilingual(freeLink); const parsedPaidLink = parseBilingual(paidLink);
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+      
       const titleName = getTranslatedName(rawProvince);
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div><div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
-      function formatLink(link) { if (!link || link === '无' || link === 'None') return t.noLink; if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`; return `<span style="color:#333; font-weight:bold;">${link}</span>`; }
+
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
+      }
+
       if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
       if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
       if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
+      
       return html;
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let allParsedData = []; const provinceDataMap = {};
+    let allParsedData = []; 
+    const provinceDataMap = {};
 
     async function fetchData() {
-      allParsedData = []; const t = i18n[currentLang];
-      try { let doneRes = await fetch('./done.json?t=' + new Date().getTime()); if (doneRes.ok) { let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim(); text.split(',').forEach(line => { let rawLine = line.trim().replace(/；/g, ';'); if (!rawLine) return; const parts = rawLine.split(';'); allParsedData.push({ rawProvince: parts[0].trim(), author: parts[1] || t.unknown, freeLink: parts[2] || '', freeLevel: parts[3] || '', paidLink: parts[4] || '', paidLevel: parts[5] || '', remark: parts[6] || '' }); }); } } catch (e) { }
+      allParsedData = [];
+      const t = i18n[currentLang];
+      try {
+        let doneRes = await fetch('./done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
+          text.split(',').forEach(line => {
+            let rawLine = line.trim().replace(/；/g, ';');
+            if (!rawLine) return;
+            const parts = rawLine.split(';');
+            const rawProvince = parts[0].trim();
+            allParsedData.push({
+              rawProvince: rawProvince,
+              author: parts[1] || t.unknown,
+              freeLink: parts[2] || '', freeLevel: parts[3] || '',
+              paidLink: parts[4] || '', paidLevel: parts[5] || '',
+              remark: parts[6] || ''
+            });
+          });
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
     async function renderMap() {
       myChart.showLoading();
       try {
-        const res = await fetch('./Turkey.json'); const realGeoJson = await res.json();
+        const res = await fetch('./Turkey.json'); 
+        const realGeoJson = await res.json();
         echarts.registerMap('turkey', realGeoJson);
-        const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
-        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
         
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+        
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
         features.forEach(featureName => {
-          // ★ 核心修复：兼容各种拼写
           const matchItem = allParsedData.find(item => {
-            const dictZh = trNameDict[featureName] ? trNameDict[featureName].zh : '';
+            const itemRaw = item.rawProvince;
+            const dictZh = regionNameDict[featureName] ? regionNameDict[featureName].zh : '';
             
-            // 1. 原样匹配
-            if (item.rawProvince === featureName || item.rawProvince === dictZh) return true;
+            // 1. 如果你直接写了 7 大区的中文名或英文名
+            if (itemRaw === featureName || itemRaw === dictZh) return true;
             
-            // 2. 消除土耳其字母的干扰 (İ 变 I)
-            const cleanFeature = featureName.replace(/İ/g, 'I').replace(/ı/g, 'i').toLowerCase();
-            const cleanItem = item.rawProvince.replace(/İ/g, 'I').replace(/ı/g, 'i').toLowerCase();
-            
-            if (cleanItem === cleanFeature) return true;
+            // 2. 如果你写了城市（比如 伊斯坦布尔），我们自动映射到对应的大区
+            if (cityToRegion[itemRaw] === featureName) return true;
             
             return false;
           });
           
-          if (matchItem) { 
-            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); 
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); 
+          if (matchItem) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
           }
         });
-        
-        myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
-        myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'turkey', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
-      } catch (e) { 
-        myChart.hideLoading(); 
-        document.getElementById('loading-tip').innerHTML = '加载本地 Turkey.json 失败'; 
-        console.error(e);
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'turkey', 
+            roam: true,
+            zoom: 1.2,
+            label: { 
+              show: true, 
+              fontSize: isMobile ? 10 : 12, 
+              color: '#333',
+              formatter: function (params) { return getTranslatedName(params.name); }
+            }, 
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false, 
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        document.getElementById('loading-tip').innerHTML = '加载本地 Turkey.json 失败，请检查文件是否存在。';
       }
     }
 
-    function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
-    async function initApp() { updateUI(); await fetchData(); renderMap(); } initApp();
-    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); renderMap(); });
-    if (!isMobile) { let isOverBox = false; let hideTimer = null; let currentHoverName = null; myChart.on('mouseover', function (params) { if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return; clearTimeout(hideTimer); currentHoverName = params.name; tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block'; if (params.event && params.event.event) { const e = params.event.event; let x = e.clientX + 20; let y = e.clientY - 20; if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20; if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10; if (y < 10) y = 10; tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px'; } }); myChart.on('mouseout', function () { hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300); }); tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); }); tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; }); }
-    myChart.on('click', function(params) { if (isMobile && provinceDataMap[params.name]) { tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto'; tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)'; } });
-    myChart.getZr().on('click', function (event) { if (isMobile && !event.target) tooltipEl.style.display = 'none'; });
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI(); await fetchData(); renderMap();
+    });
+
+    if (!isMobile) {
+      let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+        clearTimeout(hideTimer); currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+        if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20; let y = e.clientY - 20;
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
+          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+        }
+      });
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+      });
+      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+    }
+
+    myChart.on('click', function(params) {
+      if (isMobile && provinceDataMap[params.name]) {
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+      }
+    });
+    
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) tooltipEl.style.display = 'none';
+    });
+
     window.addEventListener('resize', () => myChart.resize());
   </script>
 </body>
