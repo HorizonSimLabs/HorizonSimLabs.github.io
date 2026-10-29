@@ -6,7 +6,13 @@
   <meta name="referrer" content="no-referrer" />
   <title>马来西亚地景 - HorizonSimLabs</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
+  
+  <!-- 引入 ECharts -->
   <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  
+  <!-- ★ 核心：直接引入你本地的 Malaysia.js -->
+  <script src="./Malaysia.js"></script>
+
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
@@ -62,11 +68,12 @@
       'Sabah': { zh: '沙巴', en: 'Sabah' }, 
       'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 
       'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
+      'W.P. Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
       'Labuan': { zh: '纳闽', en: 'Labuan' }, 
+      'W.P. Labuan': { zh: '纳闽', en: 'Labuan' },
       'Putrajaya': { zh: '布城', en: 'Putrajaya' } 
     };
 
-    // ★ 终极映射：把你 JSON 里的城市直接强行绑给大区
     const cityToState = {
       '吉隆坡': 'Kuala Lumpur', 'KL': 'Kuala Lumpur',
       '槟城': 'Pulau Pinang', 'Penang': 'Pulau Pinang',
@@ -140,56 +147,17 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    // ★ 终极修复：调用 ECharts 内置解码器
-    function decodeGeoJson(encodedGeoJson) {
-      if (!encodedGeoJson.UTF8Encoding) return encodedGeoJson;
-      const decodePolygon = (coordinate, encodeOffsets) => {
-        const result = [];
-        let prevX = encodeOffsets[0];
-        let prevY = encodeOffsets[1];
-        for (let i = 0; i < coordinate.length; i += 2) {
-          let x = coordinate.charCodeAt(i) - 64;
-          let y = coordinate.charCodeAt(i + 1) - 64;
-          x = (x >> 1) ^ (-(x & 1));
-          y = (y >> 1) ^ (-(y & 1));
-          x += prevX;
-          y += prevY;
-          prevX = x;
-          prevY = y;
-          result.push([x / 1024, y / 1024]);
-        }
-        return result;
-      };
-      
-      const newFeatures = encodedGeoJson.features.map(feature => {
-        const geometry = feature.geometry;
-        let newCoordinates = [];
-        if (geometry.type === 'Polygon') {
-          newCoordinates = geometry.coordinates.map((polygon, i) => decodePolygon(polygon, geometry.encodeOffsets[i]));
-        } else if (geometry.type === 'MultiPolygon') {
-          newCoordinates = geometry.coordinates.map((polygonArray, i) => {
-            return polygonArray.map((ring, j) => decodePolygon(ring, geometry.encodeOffsets[i][j]));
-          });
-        }
-        return {
-          type: 'Feature',
-          properties: feature.properties,
-          geometry: { type: geometry.type, coordinates: newCoordinates }
-        };
-      });
-      return { type: 'FeatureCollection', features: newFeatures };
-    }
-
-    async function renderMap() {
+    function renderMap() {
       myChart.showLoading();
+      
       try {
-        const res = await fetch('./Malaysia.json'); 
-        let realGeoJson = await res.json();
+        // ★ 直接从引入的 JS 中获取地图数据
+        const mapDataObj = echarts.getMap('Malaysia') || echarts.getMap('malaysia') || echarts.getMap('马来西亚');
+        if (!mapDataObj) {
+          throw new Error("未能获取到地图数据，请确保你的 Malaysia.js 已经放在同级目录且能正常加载。");
+        }
         
-        realGeoJson = decodeGeoJson(realGeoJson);
-        echarts.registerMap('malaysia', realGeoJson);
-        
-        const features = realGeoJson.features.map(f => f.properties.name);
+        const features = mapDataObj.geoJson.features.map(f => f.properties.name);
         const mapData = [];
         
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
@@ -199,10 +167,10 @@
             const itemRaw = item.rawProvince;
             const dictZh = myNameDict[featureName] ? myNameDict[featureName].zh : '';
             
-            // 1. 原样或中文匹配
+            // 1. 中文或原样匹配
             if (itemRaw === featureName || itemRaw === dictZh) return true;
             
-            // 2. 城市强行映射（解决吉隆坡、槟城的痛点）
+            // 2. 城市强行映射
             if (cityToState[itemRaw] === featureName) return true;
             
             // 3. 暴力模糊匹配
@@ -226,7 +194,7 @@
           tooltip: { show: false },
           series: [{
             type: 'map',
-            map: 'malaysia', 
+            map: mapDataObj ? mapDataObj.mapName : 'Malaysia', 
             roam: true,
             zoom: 1.2,
             label: { 
@@ -245,7 +213,7 @@
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图解析失败，请检查 Malaysia.json 是否正确。';
+        document.getElementById('loading-tip').innerHTML = '地图加载失败：' + e.message;
       }
     }
 
@@ -254,7 +222,12 @@
       document.getElementById('back-btn').innerText = i18n[currentLang].back;
     }
 
-    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    async function initApp() { 
+      updateUI(); 
+      await fetchData(); 
+      // 延迟加载，确保马来西亚 JS 已经被浏览器解析完毕
+      setTimeout(renderMap, 200); 
+    }
     initApp();
 
     document.getElementById('lang-btn').addEventListener('click', async () => {
