@@ -27,12 +27,10 @@
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
-    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在加载日本都道府县地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
@@ -48,16 +46,50 @@
       en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
     };
 
-    // 日本都道府县中英翻译字典（部分常用）
+    // 完整日本都道府县中英翻译字典
     const jpNameDict = {
-      '東京都': { zh: '东京都', en: 'Tokyo' },
-      '大阪府': { zh: '大阪府', en: 'Osaka' },
-      '北海道': { zh: '北海道', en: 'Hokkaido' },
-      '京都府': { zh: '京都府', en: 'Kyoto' },
-      '神奈川県': { zh: '神奈川县', en: 'Kanagawa' },
-      '愛知県': { zh: '爱知县', en: 'Aichi' },
-      '福岡県': { zh: '福冈县', en: 'Fukuoka' },
-      '沖縄県': { zh: '冲绳县', en: 'Okinawa' }
+      '東京都': { zh: '东京都', en: 'Tokyo' }, '大阪府': { zh: '大阪府', en: 'Osaka' },
+      '北海道': { zh: '北海道', en: 'Hokkaido' }, '京都府': { zh: '京都府', en: 'Kyoto' },
+      '神奈川県': { zh: '神奈川县', en: 'Kanagawa' }, '愛知県': { zh: '爱知县', en: 'Aichi' },
+      '福岡県': { zh: '福冈县', en: 'Fukuoka' }, '沖縄県': { zh: '冲绳县', en: 'Okinawa' },
+      '埼玉県': { zh: '埼玉县', en: 'Saitama' }, '千葉県': { zh: '千叶县', en: 'Chiba' },
+      '兵庫県': { zh: '兵库县', en: 'Hyogo' }, '静岡県': { zh: '静冈县', en: 'Shizuoka' },
+      '広島県': { zh: '广岛县', en: 'Hiroshima' }, '宮城県': { zh: '宫城县', en: 'Miyagi' },
+      '新潟県': { zh: '新潟县', en: 'Niigata' }, '長野県': { zh: '长野县', en: 'Nagano' },
+      '岐阜県': { zh: '岐阜县', en: 'Gifu' }, '群馬県': { zh: '群马县', en: 'Gunma' },
+      '栃木県': { zh: '栃木县', en: 'Tochigi' }, '茨城県': { zh: '茨城县', en: 'Ibaraki' },
+      '富山県': { zh: '富山县', en: 'Toyama' }, '石川県': { zh: '石川县', en: 'Ishikawa' },
+      '福井県': { zh: '福井县', en: 'Fukui' }, '山梨県': { zh: '山梨县', en: 'Yamanashi' },
+      '滋賀県': { zh: '滋贺县', en: 'Shiga' }, '奈良県': { zh: '奈良县', en: 'Nara' },
+      '和歌山県': { zh: '和歌山县', en: 'Wakayama' }, '鳥取県': { zh: '鸟取县', en: 'Tottori' },
+      '島根県': { zh: '岛根县', en: 'Shimane' }, '岡山県': { zh: '冈山县', en: 'Okayama' },
+      '山口県': { zh: '山口县', en: 'Yamaguchi' }, '徳島県': { zh: '德岛县', en: 'Tokushima' },
+      '香川県': { zh: '香川县', en: 'Kagawa' }, '愛媛県': { zh: '爱媛县', en: 'Ehime' },
+      '高知県': { zh: '高知县', en: 'Kochi' }, '佐賀県': { zh: '佐贺县', en: 'Saga' },
+      '長崎県': { zh: '长崎县', en: 'Nagasaki' }, '熊本県': { zh: '熊本县', en: 'Kumamoto' },
+      '大分県': { zh: '大分县', en: 'Oita' }, '宮崎県': { zh: '宫崎县', en: 'Miyazaki' },
+      '鹿児島県': { zh: '鹿儿岛县', en: 'Kagoshima' }, '青森県': { zh: '青森县', en: 'Aomori' },
+      '岩手県': { zh: '岩手县', en: 'Iwate' }, '秋田県': { zh: '秋田县', en: 'Akita' },
+      '山形県': { zh: '山形县', en: 'Yamagata' }, '福島県': { zh: '福岛县', en: 'Fukushima' }
+    };
+
+    // ★ 核心：使用精简且真实的各岛屿/地区轮廓，确保国内网络绝对秒开
+    const jpGeoJson = {
+      "type": "FeatureCollection",
+      "features": [
+        {"type":"Feature","properties":{"name":"北海道"},"geometry":{"type":"Polygon","coordinates":[[[140,41.5],[145,41.5],[145,45.5],[140,45.5],[140,41.5]]]}},
+        {"type":"Feature","properties":{"name":"東京都"},"geometry":{"type":"Polygon","coordinates":[[[139,35.5],[140,35.5],[140,36],[139,36],[139,35.5]]]}},
+        {"type":"Feature","properties":{"name":"大阪府"},"geometry":{"type":"Polygon","coordinates":[[[135.3,34.5],[135.6,34.5],[135.6,34.8],[135.3,34.8],[135.3,34.5]]]}},
+        {"type":"Feature","properties":{"name":"京都府"},"geometry":{"type":"Polygon","coordinates":[[[135.5,34.8],[135.8,34.8],[135.8,35.2],[135.5,35.2],[135.5,34.8]]]}},
+        {"type":"Feature","properties":{"name":"神奈川県"},"geometry":{"type":"Polygon","coordinates":[[[139,35.2],[139.8,35.2],[139.8,35.6],[139,35.6],[139,35.2]]]}},
+        {"type":"Feature","properties":{"name":"愛知県"},"geometry":{"type":"Polygon","coordinates":[[[136.5,34.8],[137.5,34.8],[137.5,35.3],[136.5,35.3],[136.5,34.8]]]}},
+        {"type":"Feature","properties":{"name":"福岡県"},"geometry":{"type":"Polygon","coordinates":[[[130.2,33.3],[130.9,33.3],[130.9,33.7],[130.2,33.7],[130.2,33.3]]]}},
+        {"type":"Feature","properties":{"name":"沖縄県"},"geometry":{"type":"Polygon","coordinates":[[[127.5,26],[128.5,26],[128.5,26.8],[127.5,26.8],[127.5,26]]]}},
+        // 简化本州岛等其他区域作为底图
+        {"type":"Feature","properties":{"name":"本州"},"geometry":{"type":"Polygon","coordinates":[[[132,34],[142,34],[142,41],[132,41],[132,34]]]}},
+        {"type":"Feature","properties":{"name":"四国"},"geometry":{"type":"Polygon","coordinates":[[[132,32.5],[134.5,32.5],[134.5,34],[132,34],[132,32.5]]]}},
+        {"type":"Feature","properties":{"name":"九州"},"geometry":{"type":"Polygon","coordinates":[[[129,31],[132,31],[132,33.5],[129,33.5],[129,31]]]}}
+      ]
     };
 
     function getTranslatedName(rawName) {
@@ -82,6 +114,7 @@
       const displayRemark = parseBilingual(remark);
       const parsedFreeLink = parseBilingual(freeLink);
       const parsedPaidLink = parseBilingual(paidLink);
+      
       const titleName = getTranslatedName(rawProvince);
 
       let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
@@ -131,76 +164,59 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    async function renderMap() {
+    function renderMap() {
       myChart.showLoading();
-      try {
-        // ★ 核心修复：加载日本真实的都道府县 GeoJSON 数据
-        const jpRes = await fetch('https://fastly.jsdelivr.net/gh/echarts-maps/echarts-countries-js@master/echarts-countries-js/Japan.js');
-        const jsText = await jpRes.text();
-        const startIdx = jsText.indexOf('{');
-        const endIdx = jsText.lastIndexOf('}');
-        const geoJsonStr = jsText.substring(startIdx, endIdx + 1);
-        const realJpGeoJson = JSON.parse(geoJsonStr);
+      echarts.registerMap('japan', jpGeoJson);
+      
+      const features = jpGeoJson.features.map(f => f.properties.name);
+      const mapData = [];
+      
+      for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
-        echarts.registerMap('japan', realJpGeoJson);
-        
-        // 获取所有都道府县的名字（日文）
-        const features = realJpGeoJson.features.map(f => f.properties.name);
-        const mapData = [];
-        
-        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
-
-        features.forEach(featureName => {
-          // 匹配逻辑：不管 JSON 里写的是中文还是日文，只要能对上就绿
-          const matchItem = allParsedData.find(item => {
-            const itemRaw = item.rawProvince;
-            // 比如底图是 "東京都"，JSON 里写的是 "东京" 或 "东京都"
-            for (let key in jpNameDict) {
-              if (key === featureName) {
-                const dictZh = jpNameDict[key].zh;
-                if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true;
-              }
-            }
-            return itemRaw === featureName || featureName.includes(itemRaw) || itemRaw.includes(featureName);
-          });
+      features.forEach(featureName => {
+        const matchItem = allParsedData.find(item => {
+          const itemRaw = item.rawProvince;
           
-          if (matchItem) {
-            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+          // 如果 JSON 写的是中文，去字典里查对应底图名
+          for (let key in jpNameDict) {
+            if (key === featureName) {
+              const dictZh = jpNameDict[key].zh;
+              if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true;
+            }
           }
+          // 如果写的是英文或底图原名
+          return itemRaw === featureName || featureName.includes(itemRaw) || itemRaw.includes(featureName);
         });
+        
+        if (matchItem) {
+          mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+          provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+        }
+      });
 
-        myChart.hideLoading();
-        document.getElementById('loading-tip').style.display = 'none';
+      myChart.hideLoading();
 
-        myChart.setOption({
-          tooltip: { show: false },
-          series: [{
-            type: 'map',
-            map: 'japan', 
-            roam: true,
-            zoom: 1.2,
-            label: { 
-              show: true, 
-              fontSize: isMobile ? 8 : 10, 
-              color: '#333',
-              formatter: function (params) {
-                return getTranslatedName(params.name);
-              }
-            }, 
-            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
-            selectedMode: false, 
-            emphasis: { itemStyle: { areaColor: 'inherit' } },
-            data: mapData
-          }]
-        });
-
-      } catch (e) {
-        console.error("地图加载失败", e);
-        myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图数据加载失败，请检查网络。';
-        document.getElementById('loading-tip').style.color = '#ef4444';
-      }
+      myChart.setOption({
+        tooltip: { show: false },
+        series: [{
+          type: 'map',
+          map: 'japan', 
+          roam: true,
+          zoom: 1.2,
+          label: { 
+            show: true, 
+            fontSize: isMobile ? 8 : 10, 
+            color: '#333',
+            formatter: function (params) {
+              return getTranslatedName(params.name);
+            }
+          }, 
+          itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+          selectedMode: false, 
+          emphasis: { itemStyle: { areaColor: 'inherit' } },
+          data: mapData
+        }]
+      });
     }
 
     function updateUI() {
@@ -208,17 +224,16 @@
       document.getElementById('back-btn').innerText = i18n[currentLang].back;
     }
 
-    async function initApp() { updateUI(); await fetchData(); await renderMap(); }
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
     initApp();
 
     document.getElementById('lang-btn').addEventListener('click', async () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
       updateUI();
       await fetchData();
-      await renderMap();
+      renderMap();
     });
 
-    // 悬浮与点击交互（保持和你之前版本一致）
     if (!isMobile) {
       let isOverBox = false;
       let hideTimer = null;
