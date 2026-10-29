@@ -32,9 +32,8 @@
     const tooltipEl = document.getElementById('my-tooltip');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
     let currentLang = 'zh';
+
     const i18n = { zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" }, en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" } };
-    
-    // 完整日本都道府县中英翻译字典
     const jpNameDict = { '東京都': { zh: '东京都', en: 'Tokyo' }, '大阪府': { zh: '大阪府', en: 'Osaka' }, '北海道': { zh: '北海道', en: 'Hokkaido' }, '京都府': { zh: '京都府', en: 'Kyoto' }, '神奈川県': { zh: '神奈川县', en: 'Kanagawa' }, '愛知県': { zh: '爱知县', en: 'Aichi' }, '福岡県': { zh: '福冈县', en: 'Fukuoka' }, '沖縄県': { zh: '冲绳县', en: 'Okinawa' }, '埼玉県': { zh: '埼玉县', en: 'Saitama' }, '千葉県': { zh: '千叶县', en: 'Chiba' }, '兵庫県': { zh: '兵库县', en: 'Hyogo' }, '静岡県': { zh: '静冈县', en: 'Shizuoka' }, '広島県': { zh: '广岛县', en: 'Hiroshima' }, '宮城県': { zh: '宫城县', en: 'Miyagi' }, '新潟県': { zh: '新潟县', en: 'Niigata' }, '長野県': { zh: '长野县', en: 'Nagano' }, '岐阜県': { zh: '岐阜县', en: 'Gifu' }, '群馬県': { zh: '群马县', en: 'Gunma' }, '栃木県': { zh: '栃木县', en: 'Tochigi' }, '茨城県': { zh: '茨城县', en: 'Ibaraki' }, '富山県': { zh: '富山县', en: 'Toyama' }, '石川県': { zh: '石川县', en: 'Ishikawa' }, '福井県': { zh: '福井县', en: 'Fukui' }, '山梨県': { zh: '山梨县', en: 'Yamanashi' }, '滋賀県': { zh: '滋贺县', en: 'Shiga' }, '奈良県': { zh: '奈良县', en: 'Nara' }, '和歌山県': { zh: '和歌山县', en: 'Wakayama' }, '鳥取県': { zh: '鸟取县', en: 'Tottori' }, '島根県': { zh: '岛根县', en: 'Shimane' }, '岡山県': { zh: '冈山县', en: 'Okayama' }, '山口県': { zh: '山口县', en: 'Yamaguchi' }, '徳島県': { zh: '德岛县', en: 'Tokushima' }, '香川県': { zh: '香川县', en: 'Kagawa' }, '愛媛県': { zh: '爱媛县', en: 'Ehime' }, '高知県': { zh: '高知县', en: 'Kochi' }, '佐賀県': { zh: '佐贺县', en: 'Saga' }, '長崎県': { zh: '长崎县', en: 'Nagasaki' }, '熊本県': { zh: '熊本县', en: 'Kumamoto' }, '大分県': { zh: '大分县', en: 'Oita' }, '宮崎県': { zh: '宫崎县', en: 'Miyazaki' }, '鹿児島県': { zh: '鹿儿岛县', en: 'Kagoshima' }, '青森県': { zh: '青森县', en: 'Aomori' }, '岩手県': { zh: '岩手县', en: 'Iwate' }, '秋田県': { zh: '秋田县', en: 'Akita' }, '山形県': { zh: '山形县', en: 'Yamagata' }, '福島県': { zh: '福岛县', en: 'Fukushima' } };
 
     function getTranslatedName(rawName) { if (jpNameDict[rawName]) return currentLang === 'zh' ? jpNameDict[rawName].zh : jpNameDict[rawName].en; return rawName; }
@@ -42,12 +41,12 @@
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
       const t = i18n[currentLang]; const displayAuthor = parseBilingual(author); const displayFreeLevel = parseBilingual(freeLevel); const displayPaidLevel = parseBilingual(paidLevel); const displayRemark = parseBilingual(remark); const parsedFreeLink = parseBilingual(freeLink); const parsedPaidLink = parseBilingual(paidLink);
       const titleName = getTranslatedName(rawProvince);
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      html += `<div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div><div>${t.author}${displayAuthor || t.unknown}</div><div>${t.download}</div>`;
       function formatLink(link) { if (!link || link === '无' || link === 'None') return t.noLink; if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`; return `<span style="color:#333; font-weight:bold;">${link}</span>`; }
       if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
       if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
-      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`; return html;
+      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
+      return html;
     }
 
     const myChart = echarts.init(document.getElementById('map'));
@@ -61,30 +60,25 @@
     async function renderMap() {
       myChart.showLoading();
       try {
-        const res = await fetch('https://cdn.jsdelivr.net/npm/echarts-countries-js@1.0.5/echarts-countries-js/Japan.min.js');
-        const text = await res.text(); const start = text.indexOf('{'); const end = text.lastIndexOf('}');
-        const realGeoJson = JSON.parse(text.substring(start, end + 1));
+        const res = await fetch('./Japan.json'); const realGeoJson = await res.json();
         echarts.registerMap('japan', realGeoJson);
-        
         const features = realGeoJson.features.map(f => f.properties.name); const mapData = [];
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
         features.forEach(featureName => {
           const matchItem = allParsedData.find(item => {
-            const itemRaw = item.rawProvince;
-            for (let key in jpNameDict) { if (key === featureName) { const dictZh = jpNameDict[key].zh; if (itemRaw.includes(dictZh) || dictZh.includes(itemRaw)) return true; } }
-            return itemRaw === featureName || featureName.includes(itemRaw) || itemRaw.includes(featureName);
+            const dictZh = jpNameDict[featureName] ? jpNameDict[featureName].zh : '';
+            return item.rawProvince === featureName || item.rawProvince === dictZh;
           });
           if (matchItem) { mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } }); provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark); }
         });
-
         myChart.hideLoading(); document.getElementById('loading-tip').style.display = 'none';
         myChart.setOption({ tooltip: { show: false }, series: [{ type: 'map', map: 'japan', roam: true, zoom: 1.2, label: { show: true, fontSize: isMobile ? 8 : 10, color: '#333', formatter: p => getTranslatedName(p.name) }, itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 }, selectedMode: false, emphasis: { itemStyle: { areaColor: 'inherit' } }, data: mapData }] });
-      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载失败，请检查网络'; }
+      } catch (e) { myChart.hideLoading(); document.getElementById('loading-tip').innerHTML = '加载本地 Japan.json 失败'; }
     }
 
     function updateUI() { document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn; document.getElementById('back-btn').innerText = i18n[currentLang].back; }
-    async function initApp() { updateUI(); await fetchData(); await renderMap(); } initApp();
-    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); await renderMap(); });
+    async function initApp() { updateUI(); await fetchData(); renderMap(); } initApp();
+    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); renderMap(); });
     if (!isMobile) { let isOverBox = false; let hideTimer = null; let currentHoverName = null; myChart.on('mouseover', function (params) { if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return; clearTimeout(hideTimer); currentHoverName = params.name; tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block'; if (params.event && params.event.event) { const e = params.event.event; let x = e.clientX + 20; let y = e.clientY - 20; if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20; if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10; if (y < 10) y = 10; tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px'; } }); myChart.on('mouseout', function () { hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300); }); tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); }); tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; }); }
     myChart.on('click', function(params) { if (isMobile && provinceDataMap[params.name]) { tooltipEl.innerHTML = provinceDataMap[params.name]; tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto'; tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)'; } });
     myChart.getZr().on('click', function (event) { if (isMobile && !event.target) tooltipEl.style.display = 'none'; });
