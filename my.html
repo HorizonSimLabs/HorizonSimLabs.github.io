@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在解密并加载马来西亚地图...</div>
+  <div id="loading-tip">正在加载马来西亚地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
@@ -64,6 +64,13 @@
       'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' },
       'Labuan': { zh: '纳闽', en: 'Labuan' }, 
       'Putrajaya': { zh: '布城', en: 'Putrajaya' } 
+    };
+
+    // ★ 终极映射：把你 JSON 里的城市直接强行绑给大区
+    const cityToState = {
+      '吉隆坡': 'Kuala Lumpur', 'KL': 'Kuala Lumpur',
+      '槟城': 'Pulau Pinang', 'Penang': 'Pulau Pinang',
+      '马六甲': 'Malacca', 'Melaka': 'Malacca'
     };
 
     function getTranslatedName(rawName) {
@@ -133,7 +140,7 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    // ★ 终极修复：调用 ECharts 隐藏的内置解码器，把乱码 JSON 转为真实坐标
+    // ★ 终极修复：调用 ECharts 内置解码器
     function decodeGeoJson(encodedGeoJson) {
       if (!encodedGeoJson.UTF8Encoding) return encodedGeoJson;
       const decodePolygon = (coordinate, encodeOffsets) => {
@@ -179,7 +186,6 @@
         const res = await fetch('./Malaysia.json'); 
         let realGeoJson = await res.json();
         
-        // 解密
         realGeoJson = decodeGeoJson(realGeoJson);
         echarts.registerMap('malaysia', realGeoJson);
         
@@ -193,10 +199,13 @@
             const itemRaw = item.rawProvince;
             const dictZh = myNameDict[featureName] ? myNameDict[featureName].zh : '';
             
-            // 1. 中文或原样匹配
+            // 1. 原样或中文匹配
             if (itemRaw === featureName || itemRaw === dictZh) return true;
             
-            // 2. 模糊匹配
+            // 2. 城市强行映射（解决吉隆坡、槟城的痛点）
+            if (cityToState[itemRaw] === featureName) return true;
+            
+            // 3. 暴力模糊匹配
             const cleanFeature = featureName.toLowerCase().replace(/[^a-z]/g, '');
             const cleanItem = itemRaw.toLowerCase().replace(/[^a-z\u4e00-\u9fa5]/g, '');
             if (cleanFeature.includes(cleanItem) || cleanItem.includes(cleanFeature)) return true;
