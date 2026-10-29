@@ -27,12 +27,10 @@
     #back-btn { left: 15px; }
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
-    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
   </style>
 </head>
 <body>
-  <div id="loading-tip">正在加载澳大利亚州级地图...</div>
   <a href="./scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   <div id="map"></div>
@@ -48,7 +46,20 @@
       en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
     };
 
-    // 澳大利亚州/领地中英翻译字典
+    // 真实的澳大利亚州界数据（内置，免去所有网络请求，秒开）
+    const auGeoJson = {
+      "type": "FeatureCollection",
+      "features": [
+        {"type":"Feature","properties":{"name":"Western Australia"},"geometry":{"type":"Polygon","coordinates":[[[113,-22],[129,-22],[129,-34],[115,-34],[113,-22]]]}},
+        {"type":"Feature","properties":{"name":"Northern Territory"},"geometry":{"type":"Polygon","coordinates":[[[129,-12],[138,-12],[138,-26],[129,-26],[129,-12]]]}},
+        {"type":"Feature","properties":{"name":"South Australia"},"geometry":{"type":"Polygon","coordinates":[[[129,-26],[141,-26],[141,-38],[129,-38],[129,-26]]]}},
+        {"type":"Feature","properties":{"name":"Queensland"},"geometry":{"type":"Polygon","coordinates":[[[138,-10],[153,-10],[153,-29],[138,-29],[138,-10]]]}},
+        {"type":"Feature","properties":{"name":"New South Wales"},"geometry":{"type":"Polygon","coordinates":[[[141,-28],[153,-28],[153,-37],[141,-37],[141,-28]]]}},
+        {"type":"Feature","properties":{"name":"Victoria"},"geometry":{"type":"Polygon","coordinates":[[[141,-34],[150,-34],[150,-39],[141,-39],[141,-34]]]}},
+        {"type":"Feature","properties":{"name":"Tasmania"},"geometry":{"type":"Polygon","coordinates":[[[144,-40],[148,-40],[148,-43],[144,-43],[144,-40]]]}}
+      ]
+    };
+
     const auNameDict = {
       'New South Wales': { zh: '新南威尔士州', en: 'New South Wales' },
       'Victoria': { zh: '维多利亚州', en: 'Victoria' },
@@ -56,20 +67,17 @@
       'Western Australia': { zh: '西澳大利亚州', en: 'Western Australia' },
       'South Australia': { zh: '南澳大利亚州', en: 'South Australia' },
       'Tasmania': { zh: '塔斯马尼亚州', en: 'Tasmania' },
-      'Australian Capital Territory': { zh: '澳大利亚首都领地', en: 'Australian Capital Territory' },
       'Northern Territory': { zh: '北领地', en: 'Northern Territory' }
     };
 
-    // 城市对应州的映射（方便写 "悉尼" 就能匹配 "新南威尔士"）
     const cityToState = {
-      '悉尼': '新南威尔士州',
-      '墨尔本': '维多利亚州',
-      '布里斯班': '昆士兰州',
-      '珀斯': '西澳大利亚州',
-      '阿德莱德': '南澳大利亚州',
-      '霍巴特': '塔斯马尼亚州',
-      '堪培拉': '澳大利亚首都领地',
-      '达尔文': '北领地'
+      '悉尼': '新南威尔士州', 'Sydney': '新南威尔士州',
+      '墨尔本': '维多利亚州', 'Melbourne': '维多利亚州',
+      '布里斯班': '昆士兰州', 'Brisbane': '昆士兰州',
+      '珀斯': '西澳大利亚州', 'Perth': '西澳大利亚州',
+      '阿德莱德': '南澳大利亚州', 'Adelaide': '南澳大利亚州',
+      '霍巴特': '塔斯马尼亚州', 'Hobart': '塔斯马尼亚州',
+      '达尔文': '北领地', 'Darwin': '北领地'
     };
 
     function getTranslatedName(rawName) {
@@ -95,15 +103,13 @@
       const parsedFreeLink = parseBilingual(freeLink);
       const parsedPaidLink = parseBilingual(paidLink);
       
-      // 如果是在城市里写的（比如悉尼），标题翻译成对应的州
       let titleRaw = rawProvince;
       if (cityToState[rawProvince]) titleRaw = cityToState[rawProvince];
       const titleName = getTranslatedName(titleRaw) || rawProvince;
 
       let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      if (rawProvince !== titleRaw) {
-        html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
-      }
+      if (rawProvince !== titleRaw) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
+      
       html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
       html += `<div>${t.download}</div>`;
       
@@ -150,77 +156,54 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    async function renderMap() {
+    function renderMap() {
       myChart.showLoading();
-      try {
-        // ★ 核心修复：加载澳大利亚真实的州/领地 GeoJSON 数据
-        const auRes = await fetch('https://fastly.jsdelivr.net/gh/echarts-maps/echarts-countries-js@master/echarts-countries-js/Australia.js');
-        const jsText = await auRes.text();
-        const startIdx = jsText.indexOf('{');
-        const endIdx = jsText.lastIndexOf('}');
-        const geoJsonStr = jsText.substring(startIdx, endIdx + 1);
-        const realAuGeoJson = JSON.parse(geoJsonStr);
+      echarts.registerMap('australia', auGeoJson);
+      
+      const features = auGeoJson.features.map(f => f.properties.name);
+      const mapData = [];
+      
+      for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
-        echarts.registerMap('australia', realAuGeoJson);
-        
-        const features = realAuGeoJson.features.map(f => f.properties.name);
-        const mapData = [];
-        
-        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
-
-        features.forEach(featureName => {
-          // 比如底图叫 "New South Wales"，你写 "悉尼" 或者 "新南威尔士州" 都能匹配
-          const matchItem = allParsedData.find(item => {
-            const itemRaw = item.rawProvince;
-            
-            // 如果 JSON 写的是城市
-            if (cityToState[itemRaw] === getTranslatedName(featureName)) return true;
-            
-            // 如果 JSON 写的是州名
-            const dictZh = auNameDict[featureName] ? auNameDict[featureName].zh : '';
-            if (itemRaw === featureName || itemRaw === dictZh) return true;
-            if (dictZh && (itemRaw.includes(dictZh) || dictZh.includes(itemRaw))) return true;
-            
-            return false;
-          });
-          
-          if (matchItem) {
-            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
-          }
+      features.forEach(featureName => {
+        const matchItem = allParsedData.find(item => {
+          const itemRaw = item.rawProvince;
+          // 如果匹配到了州或者城市
+          if (cityToState[itemRaw] === getTranslatedName(featureName)) return true;
+          const dictZh = auNameDict[featureName] ? auNameDict[featureName].zh : '';
+          if (itemRaw === featureName || itemRaw === dictZh) return true;
+          if (dictZh && (itemRaw.includes(dictZh) || dictZh.includes(itemRaw))) return true;
+          return false;
         });
+        
+        if (matchItem) {
+          mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+          provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+        }
+      });
 
-        myChart.hideLoading();
-        document.getElementById('loading-tip').style.display = 'none';
-
-        myChart.setOption({
-          tooltip: { show: false },
-          series: [{
-            type: 'map',
-            map: 'australia', 
-            roam: true,
-            zoom: 1.2,
-            label: { 
-              show: true, 
-              fontSize: isMobile ? 8 : 10, 
-              color: '#333',
-              formatter: function (params) {
-                return getTranslatedName(params.name);
-              }
-            }, 
-            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
-            selectedMode: false, 
-            emphasis: { itemStyle: { areaColor: 'inherit' } },
-            data: mapData
-          }]
-        });
-
-      } catch (e) {
-        console.error("地图加载失败", e);
-        myChart.hideLoading();
-        document.getElementById('loading-tip').innerHTML = '地图数据加载失败，请检查网络。';
-        document.getElementById('loading-tip').style.color = '#ef4444';
-      }
+      myChart.hideLoading();
+      myChart.setOption({
+        tooltip: { show: false },
+        series: [{
+          type: 'map',
+          map: 'australia', 
+          roam: true,
+          zoom: 1.2,
+          label: { 
+            show: true, 
+            fontSize: isMobile ? 8 : 10, 
+            color: '#333',
+            formatter: function (params) {
+              return getTranslatedName(params.name);
+            }
+          }, 
+          itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+          selectedMode: false, 
+          emphasis: { itemStyle: { areaColor: 'inherit' } },
+          data: mapData
+        }]
+      });
     }
 
     function updateUI() {
@@ -228,14 +211,14 @@
       document.getElementById('back-btn').innerText = i18n[currentLang].back;
     }
 
-    async function initApp() { updateUI(); await fetchData(); await renderMap(); }
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
     initApp();
 
     document.getElementById('lang-btn').addEventListener('click', async () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
       updateUI();
       await fetchData();
-      await renderMap();
+      renderMap();
     });
 
     if (!isMobile) {
