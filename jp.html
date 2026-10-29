@@ -121,4 +121,14 @@
     }
     function updateUI() {
       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
-      document.getElementById('back-btn').innerText = i18n[currentLang
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+    async function initApp() { updateUI(); await fetchData(); await renderMap(); }
+    initApp();
+    document.getElementById('lang-btn').addEventListener('click', async () => { currentLang = currentLang === 'zh' ? 'en' : 'zh'; updateUI(); await fetchData(); await renderMap(); if (document.getElementById('detail-panel').style.display === 'flex') openDetail(targetData); });
+    myChart.on('click', () => openDetail(targetData));
+    document.getElementById('detail-panel').addEventListener('click', function(e) { if (e.target === this) closeDetail(); });
+    window.addEventListener('resize', () => myChart.resize());
+  </script>
+</body>
+</html>
