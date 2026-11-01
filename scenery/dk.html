@@ -306,18 +306,58 @@
     let allParsedData = [];
     const provinceDataMap = {};
 
+    // ==================== done.json 解析 ====================
+    // ★ 必须按「行」解析。
+    //   done.json 里很多备注带英文逗号，例如
+    //     "...;属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG"
+    //   如果用 split(',') 切，这一条会被切成两段，正则再去掉引号和换行后，
+    //   相邻两行就会粘在一起，产生不存在的"城市"、并截断备注。
+    function parseDoneJson(rawText) {
+      const result = [];
+      if (!rawText) return result;
+
+      const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+
+      body.split(/\r?\n/).forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        // 逐行剥掉 JSON 数组的行尾逗号与首尾引号（不会被正文里的逗号影响）
+        l = l.replace(/,\s*$/, '').trim();
+        l = l.replace(/^"/, '').replace(/"$/, '').trim();
+        if (!l) return;
+
+        l = l.replace(/；/g, ';');   // 兼容中文分号
+
+        const parts = l.split(';');
+        const rawProvince = (parts[0] || '').trim();
+        if (!rawProvince) return;
+
+        // 备注里可能还有分号，全部并入备注
+        const remark = parts.length > 6 ? parts.slice(6).join(';') : (parts[6] || '');
+
+        result.push({
+          rawProvince: rawProvince,
+          author: parts[1] || i18n[currentLang].unknown,
+          freeLink: parts[2] || '', freeLevel: parts[3] || '',
+          paidLink: parts[4] || '', paidLevel: parts[5] || '',
+          remark: remark
+        });
+      });
+
+      return result;
+    }
+
     async function fetchData() {
       allParsedData = [];
       const t = i18n[currentLang];
       try {
         let doneRes = await fetch('../done.json?t=' + new Date().getTime());
         if (doneRes.ok) {
-          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
-          text.split(',').forEach(line => {
-            let rawLine = line.trim().replace(/；/g, ';');
-            if (!rawLine) return;
-            const parts = rawLine.split(';');
-            const rawProvince = parts[0].trim();
+          // ★ 按行解析，避免备注里的英文逗号把条目切断
+          const entries = parseDoneJson(await doneRes.text());
+          entries.forEach(entry => {
+            const rawProvince = entry.rawProvince;
             allParsedData.push({
               rawProvince: rawProvince,
               author: parts[1] || t.unknown,
