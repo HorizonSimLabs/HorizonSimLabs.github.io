@@ -1,10 +1,66 @@
 [
   {
-    "name": "全日空星空联盟彩绘787",
-    "aircraft": "Boeing 787",
-    "airline": "全日本空输株式会社",
-    "author": "寻天",
-    "image": "./image/全日空星空联盟彩绘787.jpeg",
-    "link": "https://www.123684.com/s/AYBqVv-7fCxH?pwd=sxUR#"
+    "name": "A350国航2020彩绘",
+    "aircraft": "Airbus A350",
+    "airline": "中国国际航空",
+    "author": "Serein.",
+    "image": "./image/A350国航2020彩绘.jpg",
+    "link": "https://ifdian.net/item/44f1360ccdbd11f08de752540025c377"
+  },
+  {
+    "name": "A35K汉莎航空碳纤维涂装",
+    "aircraft": "Airbus A350-1000",
+    "airline": "德国汉莎航空",
+    "author": "Serein.",
+    "image": "./image/A35K汉莎航空碳纤维涂装.png",
+    "link": "https://ifdian.net/item/80671294e87d11f0bb1a52540025c377"
+  },
+  {
+    "name": "Delta Airlines 100Years",
+    "aircraft": "Airbus A350",
+    "airline": "达美航空/Delta Airlines",
+    "author": "Serein.",
+    "image": "./image/Delta Airlines 100Years.png",
+    "link": "https://ifdian.net/item/5788546603f611f1b51a52540025c377"
+  },
+  {
+    "name": "A35K STARLUX涂装",
+    "aircraft": "Airbus A350-1000",
+    "airline": "星宇航空/STARLUX Airlines",
+    "author": "Serein.",
+    "image": "./image/A35K STARLUX涂装.jpg",
+    "link": "https://ifdian.net/item/bc0b4aa8318011f18bb952540025c377"
+  },
+  {
+    "name": "Hainan Airlines 5 Star Airlines B-1343",
+    "aircraft": "Boeing 787-9",
+    "airline": "海南航空",
+    "author": "Serein.",
+    "image": "./image/Hainan Airlines 5 Star Airlines B-1343.jpg",
+    "link": "https://ifdian.net/item/ae935710454b11f19a6b52540025c377"
+  },
+  {
+    "name": "吉祥航空B787-9红宝石彩绘",
+    "aircraft": "Boeing 787-9",
+    "airline": "吉祥航空",
+    "author": "Serein.",
+    "image": "./image/吉祥航空B787-9红宝石彩绘.jpg",
+    "link": "https://ifdian.net/item/b3892896456c11f1a3e25254001e7c00"
+  },
+  {
+    "name": "A350澳洲航空日出计划原型机",
+    "aircraft": "Airbus A350",
+    "airline": "澳洲航空",
+    "author": "Serein.",
+    "image": "./image/A350澳洲航空日出计划原型机.jpg",
+    "link": "https://ifdian.net/item/e8ffceac47ca11f1a3a152540025c377"
+  },
+  {
+    "name": "A350中国东方航空全机队",
+    "aircraft": "Airbus A350-1000",
+    "airline": "中国东方航空",
+    "author": "Serein.",
+    "image": "./image/A350中国东方航空全机队.jpg",
+    "link": "https://ifdian.net/item/f5d110c4485a11f197e55254001e7c00"
   }
 ]

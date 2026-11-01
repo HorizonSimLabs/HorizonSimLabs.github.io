@@ -57,8 +57,26 @@
       }
     };
 
-    // ★ 终极对照表：包含所有全称和简称
+    // ★ 终极对照表：以 GeoJSON/South_Korea.json 里的名称为主键，中英译名齐全
     const krMapDict = {
+      'Seoul': { zh: '首尔', en: 'Seoul' },
+      'Busan': { zh: '釜山', en: 'Busan' },
+      'Daegu': { zh: '大邱', en: 'Daegu' },
+      'Incheon': { zh: '仁川', en: 'Incheon' },
+      'Gwangju': { zh: '光州', en: 'Gwangju' },
+      'Daejeon': { zh: '大田', en: 'Daejeon' },
+      'Ulsan': { zh: '蔚山', en: 'Ulsan' },
+      'Sejong': { zh: '世宗', en: 'Sejong' },
+      'Gyeonggi-do': { zh: '京畿道', en: 'Gyeonggi' },
+      'Gangwon-do': { zh: '江原道', en: 'Gangwon' },
+      'Chungcheongbuk-do': { zh: '忠清北道', en: 'Chungcheongbuk' },
+      'Chungcheongnam-do': { zh: '忠清南道', en: 'Chungcheongnam' },
+      'Jeollabuk-do': { zh: '全罗北道', en: 'Jeollabuk' },
+      'Jeollanam-do': { zh: '全罗南道', en: 'Jeollanam' },
+      'Gyeongsangbuk-do': { zh: '庆尚北道', en: 'Gyeongsangbuk' },
+      'Gyeongsangnam-do': { zh: '庆尚南道', en: 'Gyeongsangnam' },
+      'Jeju-do': { zh: '济州', en: 'Jeju' },
+      // 兼容韩文写法
       '서울특별시': { zh: '首尔', en: 'Seoul' },
       '부산광역시': { zh: '釜山', en: 'Busan' },
       '대구광역시': { zh: '大邱', en: 'Daegu' },
@@ -69,42 +87,55 @@
       '세종특별자치시': { zh: '世宗', en: 'Sejong' },
       '경기도': { zh: '京畿道', en: 'Gyeonggi' },
       '강원도': { zh: '江原道', en: 'Gangwon' },
-      '강원특별자치도': { zh: '江原道', en: 'Gangwon' },
       '충청북도': { zh: '忠清北道', en: 'Chungcheongbuk' },
       '충청남도': { zh: '忠清南道', en: 'Chungcheongnam' },
       '전라북도': { zh: '全罗北道', en: 'Jeollabuk' },
-      '전북특별자치도': { zh: '全罗北道', en: 'Jeollabuk' },
-      '전라남도': { zh: '全罗南道', en: 'Jeollanam' },
+      '전남광역시': { zh: '全罗南道', en: 'Jeollanam' },
       '경상북도': { zh: '庆尚北道', en: 'Gyeongsangbuk' },
       '경상남도': { zh: '庆尚南道', en: 'Gyeongsangnam' },
       '제주특별자치도': { zh: '济州', en: 'Jeju' }
     };
 
+    // 中文 → 中文译名反查（用于把 done.json 里的中文名对到底图名称）
+    const krZhToKey = {};
+    for (let k in krMapDict) {
+      if (!krZhToKey[krMapDict[k].zh]) krZhToKey[krMapDict[k].zh] = k;
+    }
+
     // 翻译地图标签
     function getTranslatedName(rawName) {
-      // 世界地图里韩国整块的名字是 "Korea"
-      if (rawName === 'Korea' || rawName === '韩国') return currentLang === 'zh' ? '韩国' : 'South Korea';
       if (krMapDict[rawName]) {
         return currentLang === 'zh' ? krMapDict[rawName].zh : krMapDict[rawName].en;
       }
       return rawName; // 如果实在没匹配到，显示原样
     }
 
-    // 名字脱壳匹配
+    // 名字脱壳匹配：把底图名 / done.json 名 统一成一个可比较的键
     function cleanKrName(name) {
       if (!name) return '';
-      if (name === '韩国' || name === 'Korea' || name === 'South Korea' || name === '大韩民国') return 'Korea';
-      let clean = name.replace(/(特别市|广域市|特别自治市|特别自治道|道|市)/g, '').trim();
-      if (krMapDict[name]) return name;
-      
-      // 将中文反查成韩文，以匹配底图
-      for (let krKey in krMapDict) {
-        const dictZh = krMapDict[krKey].zh;
-        if (dictZh === clean || dictZh.includes(clean) || clean.includes(dictZh.replace(/(特别市|广域市|道|市)/g, ''))) {
-          return krKey; 
-        }
+      const raw = String(name).trim();
+
+      // 1) 直接命中底图主键
+      if (krMapDict[raw]) return raw;
+
+      // 2) 中文译名 → 底图主键（首尔 → Seoul）
+      if (krZhToKey[raw]) return krZhToKey[raw];
+
+      // 3) 韩文 / 带后缀的写法
+      if (krMapDict[raw.replace(/(特别市|广域市|特别自治市|特别自治道|道|市)$/, '')]) {
+        return raw.replace(/(特别市|广域市|特别自治市|特别自治道|道|市)$/, '');
       }
-      return clean;
+
+      // 4) 去掉 -do / -si / Prefecture 之类的后缀再比一次
+      const stripped = raw.replace(/-(do|si|gu)$/i, '').replace(/\s*Prefecture$/i, '').trim();
+      if (krMapDict[stripped]) return stripped;
+
+      // 5) 反向：中文译名包含关系（首尔特别市 → 首尔）
+      for (let zh in krZhToKey) {
+        if (raw === zh || raw.indexOf(zh) === 0) return krZhToKey[zh];
+      }
+
+      return stripped;
     }
 
     function parseBilingual(text) {
@@ -202,11 +233,9 @@
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
 
-    // ★ 韩国要的是「省级（道/广域市）分区」轮廓，ECharts 自带的 world.json 里韩国只有一整块，
-    //   所以这里走和日本 / 澳大利亚相同的方案：优先读取 GeoJSON 目录下的韩国分区数据，
-    //   本地没有时再回退到原来的在线分区数据源。
+    // ★ 韩国要的是「省级（道 / 广域市）」分区轮廓，world.json 里韩国只有一整块，
+    //   所以优先读取 GeoJSON/South_Korea.json，本地没有再回退到在线分区数据源。
     const KOREA_GEOJSON_URLS = [
-      '../GeoJSON/Korea.json',
       '../GeoJSON/South_Korea.json',
       'https://fastly.jsdelivr.net/gh/southkorea/southkorea-maps@master/kostat/2013/json/skorea_provinces_geo_simple.json',
       'https://cdn.jsdelivr.net/gh/southkorea/southkorea-maps@master/kostat/2013/json/skorea_provinces_geo_simple.json'
@@ -219,7 +248,7 @@
           if (res.ok) return await res.json();
         } catch (e) { console.warn('韩国分区数据读取失败，尝试下一个源：', url); }
       }
-      throw new Error('韩国分区地图数据加载失败，请检查网络或 GeoJSON/Korea.json。');
+      throw new Error('韩国分区地图数据加载失败，请检查网络或 GeoJSON/South_Korea.json。');
     }
 
     async function renderMap() {
@@ -237,20 +266,18 @@
         
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
-        // 逐个省/市匹配 done.json 里的条目（首尔 → 서울특별시 …）
+        // 逐个省/市匹配 done.json 里的条目
+        // ★ 必须用严格相等：以前用 includes 双向包含，短名字会误匹配一大片
         features.forEach(featureName => {
           const cleanFeature = cleanKrName(featureName);
-          
-          const matchItem = allParsedData.find(item => {
-            const cleanItem = cleanKrName(item.rawProvince);
-            return cleanItem === cleanFeature || 
-                   cleanItem.includes(cleanFeature) || 
-                   cleanFeature.includes(cleanItem);
-          });
-          
-          if (matchItem) {
+
+          const items = allParsedData.filter(item => cleanKrName(item.rawProvince) === cleanFeature);
+
+          if (items.length > 0) {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+            provinceDataMap[featureName] = items
+              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
+              .join('<hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;"/>');
           }
         });
 
@@ -284,7 +311,7 @@
         const tipEl = document.getElementById('loading-tip');
         if (tipEl) {
           tipEl.style.display = 'block';
-          tipEl.innerHTML = '地图数据加载失败，请检查网络或 GeoJSON/Korea.json 是否存在。';
+          tipEl.innerHTML = '地图数据加载失败，请检查网络或 GeoJSON/South_Korea.json 是否存在。';
           tipEl.style.color = '#ef4444';
         }
       }

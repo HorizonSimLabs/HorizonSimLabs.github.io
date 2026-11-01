@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>朝鲜地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
+    #map { width: 100%; height: 100%; }
+    #my-tooltip {
+      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
+      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
+    }
+    .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
+    .my-link:hover { text-decoration: underline; }
+    .ui-btn {
+      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
+      backdrop-filter: blur(10px); transition: 0.3s;
+    }
+    .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
+    #back-btn { left: 15px; }
+    #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
+    #lang-btn:hover { background: #059669; }
+    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
+    @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
+  </style>
+</head>
+<body>
+  <div id="loading-tip">正在加载朝鲜地图...</div>
+  <a href="../scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
+  <button id="lang-btn" class="ui-btn">Switch to English</button>
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+
+  <script>
+    const tooltipEl = document.getElementById('my-tooltip');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
+    };
+
+    // ★ 以 GeoJSON/North_Korea.json 里的名称为主键
+    const kpMapDict = {
+      'Pyongyang': { zh: '平壤', en: 'Pyongyang' },
+      'North Pyongan': { zh: '平安北道', en: 'North Pyongan' },
+      'Pyongannam-do': { zh: '平安南道', en: 'South Pyongan' },
+      'Chagang': { zh: '慈江道', en: 'Chagang' },
+      'North Hamgyong': { zh: '咸镜北道', en: 'North Hamgyong' },
+      'Hamgyongnam-do': { zh: '咸镜南道', en: 'South Hamgyong' },
+      'Ryanggang': { zh: '两江道', en: 'Ryanggang' },
+      'Hwanghaebuk-do': { zh: '黄海北道', en: 'North Hwanghae' },
+      'Hwanghaenam-do': { zh: '黄海南道', en: 'South Hwanghae' },
+      'Kangwon-do': { zh: '江原道', en: 'Kangwon' },
+      'Kumgang-gun/Kumgangsan Tourist Region': { zh: '金刚山旅游区', en: 'Kumgangsan Tourist Region' }
+    };
+
+    // 中文译名 → 底图主键
+    const kpZhToKey = {};
+    for (let k in kpMapDict) {
+      if (!kpZhToKey[kpMapDict[k].zh]) kpZhToKey[kpMapDict[k].zh] = k;
+    }
+
+    // 常见别名（城市 / 简称 / 旧写法）
+    const kpAlias = {
+      '平壤市': 'Pyongyang', '平壤特别市': 'Pyongyang',
+      '新义州': 'North Pyongan', '南浦': 'Pyongannam-do', '开城': 'Hwanghaenam-do',
+      '元山': 'Kangwon-do', '清津': 'North Hamgyong', '咸兴': 'Hamgyongnam-do',
+      '惠山': 'Ryanggang', '价川': 'Pyongannam-do', '罗先': 'North Hamgyong',
+      '江界': 'Chagang', '沙里院': 'Hwanghaebuk-do', '海州': 'Hwanghaenam-do',
+      '北仓': 'Pyongannam-do', '金刚山': 'Kumgang-gun/Kumgangsan Tourist Region'
+    };
+
+    function getTranslatedName(rawName) {
+      if (kpMapDict[rawName]) return currentLang === 'zh' ? kpMapDict[rawName].zh : kpMapDict[rawName].en;
+      return rawName;
+    }
+
+    // 把底图名 / done.json 名 统一成可比较的键
+    function cleanKpName(name) {
+      if (!name) return '';
+      const raw = String(name).trim();
+
+      if (kpMapDict[raw]) return raw;                 // 直接命中底图主键
+      if (kpAlias[raw]) return kpAlias[raw];          // 城市别名
+      if (kpZhToKey[raw]) return kpZhToKey[raw];      // 中文译名
+      if (kpAlias[raw.replace(/(市|道|特别市)$/, '')]) return kpAlias[raw.replace(/(市|道|特别市)$/, '')];
+      if (kpZhToKey[raw.replace(/(市|道|特别市)$/, '')]) return kpZhToKey[raw.replace(/(市|道|特别市)$/, '')];
+
+      // 英文常见后缀
+      const stripped = raw.replace(/-do$/i, '').replace(/\s*Province$/i, '').trim();
+      if (kpMapDict[stripped]) return stripped;
+
+      for (let zh in kpZhToKey) {
+        if (raw === zh || raw.indexOf(zh) === 0) return kpZhToKey[zh];
+      }
+      return stripped;
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      if (currentLang === 'zh') return parts[0].trim();
+      return (parts[1] || parts[0]).trim();
+    }
+
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+
+      const key = cleanKpName(rawProvince);
+      const titleName = kpMapDict[key] ? getTranslatedName(key) : rawProvince;
+
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
+      if (titleName !== rawProvince) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
+      }
+
+      if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
+      if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
+      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
+      
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+    let allParsedData = [];
+    const provinceDataMap = {};
+
+    async function fetchData() {
+      allParsedData = [];
+      const t = i18n[currentLang];
+      try {
+        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
+          text.split(',').forEach(line => {
+            let rawLine = line.trim().replace(/；/g, ';');
+            if (!rawLine) return;
+            const parts = rawLine.split(';');
+            const rawProvince = parts[0].trim();
+            allParsedData.push({
+              rawProvince: rawProvince,
+              author: parts[1] || t.unknown,
+              freeLink: parts[2] || '', freeLevel: parts[3] || '',
+              paidLink: parts[4] || '', paidLevel: parts[5] || '',
+              remark: parts[6] || ''
+            });
+          });
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
+    }
+
+    // 朝鲜的一级行政区划（道 / 直辖市 / 特别区）
+    const KOREA_GEOJSON_URLS = [
+      '../GeoJSON/North_Korea.json',
+      'https://fastly.jsdelivr.net/gh/southkorea/southkorea-maps@master/kostat/2013/json/northkorea_provinces_geo_simple.json'
+    ];
+
+    async function loadKoreaGeoJson() {
+      for (const url of KOREA_GEOJSON_URLS) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) return await res.json();
+        } catch (e) { console.warn('朝鲜分区数据读取失败，尝试下一个源：', url); }
+      }
+      throw new Error('朝鲜分区地图数据加载失败，请检查 GeoJSON/North_Korea.json。');
+    }
+
+    async function renderMap() {
+      myChart.showLoading();
+      try {
+        const realGeoJson = await loadKoreaGeoJson();
+        echarts.registerMap('northkorea', realGeoJson);
+
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
+        // 逐个行政区匹配 done.json 里的条目 —— 必须严格相等，短名字不能误匹配一大片
+        features.forEach(featureName => {
+          const cleanFeature = cleanKpName(featureName);
+          const items = allParsedData.filter(item => cleanKpName(item.rawProvince) === cleanFeature);
+
+          if (items.length > 0) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+            provinceDataMap[featureName] = items
+              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
+              .join('<hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;"/>');
+          }
+        });
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'northkorea',
+            roam: true,
+            zoom: 1.4,
+            label: {
+              show: true,
+              fontSize: isMobile ? 8 : 10,
+              color: '#333',
+              formatter: function (params) { return getTranslatedName(params.name); }
+            },
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false,
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        const tipEl = document.getElementById('loading-tip');
+        tipEl.style.display = 'block';
+        tipEl.style.color = '#ef4444';
+        tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/North_Korea.json 是否存在。';
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI(); await fetchData(); renderMap();
+    });
+
+    if (!isMobile) {
+      let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+        clearTimeout(hideTimer); currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+        if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20; let y = e.clientY - 20;
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
+          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+        }
+      });
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+      });
+      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+    }
+
+    myChart.on('click', function(params) {
+      if (isMobile && provinceDataMap[params.name]) {
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+      }
+    });
+    
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) tooltipEl.style.display = 'none';
+    });
+
+    window.addEventListener('resize', () => myChart.resize());
+  </script>
+</body>
+</html>
