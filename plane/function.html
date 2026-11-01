@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HorizonSimLabs - 飞机功能</title>
+    <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #0f172a; color: #fff; font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh; background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            padding: 30px 20px;
+        }
+        .header {
+            display: flex; align-items: center; justify-content: space-between;
+            max-width: 1200px; margin: 0 auto 30px auto;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 20px;
+        }
+        h2 { font-size: 2rem; color: #e2e8f0; }
+        .back-link {
+            color: #94a3b8; text-decoration: none; font-size: 0.9rem;
+            padding: 8px 16px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; transition: 0.3s;
+        }
+        .back-link:hover { color: #fff; background: rgba(255,255,255,0.1); }
+
+        .filter-bar {
+            max-width: 1200px; margin: 0 auto 30px auto;
+            display: flex; gap: 20px; flex-wrap: wrap;
+            background: rgba(30, 41, 59, 0.6); padding: 15px 20px; border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 200px; }
+        .filter-group label { font-size: 0.85rem; color: #94a3b8; font-weight: bold; }
+        .filter-group select {
+            background: #1e293b; color: #fff; border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px; padding: 10px; font-size: 0.95rem; outline: none; cursor: pointer; transition: 0.3s;
+        }
+        .filter-group select:focus { border-color: #10b981; }
+
+        .skin-grid {
+            max-width: 1200px; margin: 0 auto;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 25px;
+        }
+        .skin-card {
+            background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px; overflow: hidden; transition: all 0.3s ease; display: flex; flex-direction: column;
+        }
+        .skin-card:hover { transform: translateY(-5px); border-color: #10b981; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.2); }
+        .card-image { width: 100%; height: 160px; object-fit: cover; background: #0f172a; }
+        .card-content { padding: 15px; flex: 1; display: flex; flex-direction: column; }
+        .card-title { font-size: 1.1rem; font-weight: bold; color: #fff; margin-bottom: 10px; line-height: 1.4; }
+        .card-info { font-size: 0.85rem; color: #94a3b8; margin-bottom: 15px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .card-info span { color: #cbd5e1; font-weight: 500; }
+        
+        .btn-group { display: flex; gap: 10px; margin-top: auto; }
+        .download-btn {
+            flex: 1; text-align: center; padding: 10px;
+            background: #10b981; color: #fff; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background 0.3s;
+        }
+        .download-btn:hover { background: #059669; }
+        .desc-btn {
+            flex: 1; text-align: center; padding: 10px; border: 1px solid #3b82f6; background: transparent;
+            color: #3b82f6; text-decoration: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: all 0.3s;
+        }
+        .desc-btn:hover { background: #3b82f6; color: #fff; }
+
+        .empty-state { grid-column: 1 / -1; text-align: center; padding: 50px; color: #94a3b8; font-size: 1.1rem; }
+
+        /* ★ 详情弹窗样式 (升级：支持多图) */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(6px);
+            display: none; justify-content: center; align-items: center; z-index: 1000;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #1e293b; border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px; width: 90%; max-width: 750px; padding: 25px 25px 20px 25px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative;
+            animation: modalIn 0.3s ease; max-height: 85vh; display: flex; flex-direction: column;
+        }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-title { font-size: 1.4rem; font-weight: bold; color: #10b981; margin-bottom: 10px; padding-right: 30px; word-break: break-word; }
+        .modal-desc { 
+            font-size: 0.95rem; line-height: 1.7; color: #cbd5e1; 
+            white-space: pre-wrap; word-break: break-word;
+            max-height: 30vh; overflow-y: auto; 
+            padding-right: 8px; margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;
+        }
+        /* 滚动条美化 */
+        .modal-desc::-webkit-scrollbar { width: 5px; }
+        .modal-desc::-webkit-scrollbar-track { background: #0f172a; border-radius: 10px; }
+        .modal-desc::-webkit-scrollbar-thumb { background: #10b981; border-radius: 10px; }
+
+        .modal-gallery {
+            display: flex; flex-wrap: wrap; gap: 12px; 
+            overflow-y: auto; max-height: 40vh; padding: 5px 2px 5px 2px;
+            justify-content: center;
+        }
+        .modal-gallery img {
+            width: calc(33.333% - 8px); min-width: 140px; 
+            height: 120px; object-fit: cover; 
+            border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: zoom-in; background: #0f172a;
+        }
+        .modal-gallery img:hover { transform: scale(1.02); border-color: #10b981; }
+        .close-btn {
+            position: absolute; top: 15px; right: 20px;
+            background: none; border: none; color: #94a3b8; font-size: 1.8rem; line-height: 1; cursor: pointer; transition: 0.3s;
+            z-index: 10;
+        }
+        .close-btn:hover { color: #fff; }
+
+        /* 图片放大查看层 (简易灯箱) */
+        .lightbox {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); display: none; justify-content: center; align-items: center;
+            z-index: 2000; padding: 30px; cursor: zoom-out;
+        }
+        .lightbox img {
+            max-width: 90vw; max-height: 90vh; border-radius: 8px; 
+            box-shadow: 0 0 40px rgba(16,185,129,0.3); border: 2px solid rgba(255,255,255,0.2);
+            object-fit: contain;
+        }
+
+        /* 图片加载失败占位 */
+        .img-fallback {
+            background: #0f172a; color: #475569; display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; width: 100%; height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>飞机功能插件</h2>
+        <a href="../plane.html" class="back-link">← 返回飞机分类</a>
+    </div>
+
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>机型 (Aircraft)</label>
+            <select id="filter-aircraft"><option value="all">全部机型</option></select>
+        </div>
+        <div class="filter-group">
+            <label>作者 (Author)</label>
+            <select id="filter-author"><option value="all">全部作者</option></select>
+        </div>
+    </div>
+
+    <div class="skin-grid" id="skin-list">
+        <div class="empty-state">正在加载功能数据...</div>
+    </div>
+
+    <!-- 详情弹窗结构 (升级) -->
+    <div class="modal-overlay" id="desc-modal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeDesc()">×</button>
+            <div class="modal-title" id="modal-title">功能介绍</div>
+            <div class="modal-desc" id="modal-desc"></div>
+            <!-- 图片画廊 -->
+            <div class="modal-gallery" id="modal-gallery"></div>
+        </div>
+    </div>
+
+    <!-- 简易灯箱 (点击查看大图) -->
+    <div class="lightbox" id="lightbox">
+        <img id="lightbox-img" src="" alt="放大图片">
+    </div>
+
+    <script>
+        let allSkins = [];
+        const modalOverlay = document.getElementById('desc-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDesc = document.getElementById('modal-desc');
+        const modalGallery = document.getElementById('modal-gallery');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+
+        // ---------- 弹窗关闭 ----------
+        function closeDesc() {
+            modalOverlay.style.display = 'none';
+            modalGallery.innerHTML = ''; // 清空图片
+        }
+
+        // 点击遮罩关闭
+        modalOverlay.addEventListener('click', (e) => {
+            if (e.target === modalOverlay) closeDesc();
+        });
+
+        // 灯箱关闭
+        lightbox.addEventListener('click', () => {
+            lightbox.style.display = 'none';
+            lightboxImg.src = '';
+        });
+
+        // 按 ESC 关闭灯箱 / 弹窗
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (lightbox.style.display === 'flex') {
+                    lightbox.style.display = 'none';
+                } else if (modalOverlay.style.display === 'flex') {
+                    closeDesc();
+                }
+            }
+        });
+
+        // ---------- 图片点击放大 (灯箱) ----------
+        function openLightbox(src) {
+            if (!src) return;
+            lightboxImg.src = src;
+            lightbox.style.display = 'flex';
+        }
+
+        // ---------- 打开详情弹窗 (核心修改) ----------
+        function openDesc(name, desc, images) {
+            // 如果没有介绍且没有图片，给出提示
+            const hasDesc = desc && desc.trim() !== '';
+            if (!hasDesc && (!images || images.length === 0)) {
+                alert('该插件暂无详细介绍和图片。');
+                return;
+            }
+
+            // 设置标题和描述
+            modalTitle.innerText = name || '功能介绍';
+            modalDesc.innerText = desc || '暂无文字描述';
+
+            // 构建图片画廊 (使用 image 目录)
+            modalGallery.innerHTML = '';
+            if (images && images.length > 0) {
+                images.forEach(imgName => {
+                    if (!imgName || typeof imgName !== 'string') return;
+                    // 构建图片路径：function.json 里的图片相对 plane/ 目录，即 plane/image/xxx
+                    // 若写的是完整 URL 或绝对路径则直接使用
+                    let src = './image/' + imgName;
+                    if (imgName.startsWith('http') || imgName.startsWith('/') || imgName.startsWith('./') || imgName.startsWith('../')) {
+                        src = imgName; // 绝对路径或已指定
+                    }
+                    const img = document.createElement('img');
+                    img.src = src;
+                    img.alt = name + ' 截图';
+                    img.loading = 'lazy';
+                    img.onerror = function() {
+                        // 图片加载失败时显示占位
+                        this.style.display = 'none';
+                        // 可选：插入一个提示图标，但不影响布局，简单处理
+                    };
+                    img.onclick = (e) => {
+                        e.stopPropagation(); // 防止触发弹窗关闭 (但灯箱有独立事件)
+                        openLightbox(src);
+                    };
+                    modalGallery.appendChild(img);
+                });
+            } else {
+                // 没有图片时显示提示
+                const p = document.createElement('p');
+                p.style.color = '#64748b';
+                p.style.fontSize = '0.9rem';
+                p.style.width = '100%';
+                p.style.textAlign = 'center';
+                p.innerText = '暂无相关图片';
+                modalGallery.appendChild(p);
+            }
+
+            modalOverlay.style.display = 'flex';
+        }
+
+        // 阻止点击弹窗内容时关闭弹窗 (已经通过 overlay 判断，但图片点击事件可能冒泡)
+        // 不需要额外处理，因为 overlay 点击判断 target 即可
+
+        // ---------- 数据加载与渲染 ----------
+        async function init() {
+            try {
+                const res = await fetch('./function.json?t=' + new Date().getTime());
+                if (!res.ok) throw new Error('找不到 function.json');
+                allSkins = await res.json();
+                if (!Array.isArray(allSkins)) throw new Error('必须是数组');
+                
+                populateFilters(allSkins);
+                renderCards(allSkins);
+                bindFilterEvents();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('skin-list').innerHTML = `<div class="empty-state" style="color:#f87171;">加载失败！请确保存在 function.json 且格式正确。</div>`;
+            }
+        }
+
+        function populateFilters(data) {
+            const aircrafts = [...new Set(data.map(item => item.aircraft))].filter(Boolean);
+            const authors = [...new Set(data.map(item => item.author))].filter(Boolean);
+            const selAircraft = document.getElementById('filter-aircraft');
+            const selAuthor = document.getElementById('filter-author');
+            // 清空现有选项 (保留第一个"全部")
+            selAircraft.innerHTML = '<option value="all">全部机型</option>';
+            selAuthor.innerHTML = '<option value="all">全部作者</option>';
+            aircrafts.forEach(val => selAircraft.innerHTML += `<option value="${val}">${val}</option>`);
+            authors.forEach(val => selAuthor.innerHTML += `<option value="${val}">${val}</option>`);
+        }
+
+        function renderCards(data) {
+            const listEl = document.getElementById('skin-list');
+            if (data.length === 0) {
+                listEl.innerHTML = '<div class="empty-state">没有找到符合条件的功能。</div>';
+                return;
+            }
+            let html = '';
+            data.forEach(item => {
+                // 判断是否有介绍或图片，有就显示按钮
+                const hasDesc = item.description && item.description.trim() !== '';
+                const hasImages = item.images && Array.isArray(item.images) && item.images.length > 0;
+                const showDescBtn = hasDesc || hasImages;
+
+                // 安全地处理参数 (使用 encodeURIComponent 防止引号破坏)
+                const safeName = item.name ? encodeURIComponent(item.name) : '未命名功能';
+                const safeDesc = item.description ? encodeURIComponent(item.description) : '';
+                // 图片数组处理成 JSON 字符串并 encode
+                const imagesArray = item.images || [];
+                const safeImages = encodeURIComponent(JSON.stringify(imagesArray));
+
+                const descBtnHtml = showDescBtn 
+                    ? `<button class="desc-btn" onclick="openDesc(decodeURIComponent('${safeName}'), decodeURIComponent('${safeDesc}'), JSON.parse(decodeURIComponent('${safeImages}')))">查看介绍</button>` 
+                    : '';
+
+                html += `
+                    <div class="skin-card">
+                        ${item.image ? `<img src="${item.image}" class="card-image" alt="${item.name}" onerror="this.style.display='none'; this.parentNode.querySelector('.card-image-fallback')?.style.display='flex';">` : `<div class="card-image" style="display:flex;align-items:center;justify-content:center;color:#475569;">无预览图</div>`}
+                        <div class="card-content">
+                            <div class="card-title">${item.name || '未命名功能'}</div>
+                            <div class="card-info">
+                                <div>机型：<span>${item.aircraft || '未知'}</span></div>
+                                <div>作者：<span>${item.author || '未知'}</span></div>
+                            </div>
+                            <div class="btn-group">
+                                ${item.link ? `<a href="${item.link}" target="_blank" class="download-btn">点击下载</a>` : `<a href="javascript:void(0)" class="download-btn" style="background:#475569;cursor:not-allowed;">暂无链接</a>`}
+                                ${descBtnHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function bindFilterEvents() {
+            const selAircraft = document.getElementById('filter-aircraft');
+            const selAuthor = document.getElementById('filter-author');
+            function applyFilters() {
+                const a = selAircraft.value;
+                const u = selAuthor.value;
+                const filtered = allSkins.filter(item => {
+                    return (a === 'all' || item.aircraft === a) && (u === 'all' || item.author === u);
+                });
+                renderCards(filtered);
+            }
+            // 移除原有监听避免重复 (简单处理: 先移除再添加)
+            selAircraft.removeEventListener('change', applyFilters);
+            selAuthor.removeEventListener('change', applyFilters);
+            selAircraft.addEventListener('change', applyFilters);
+            selAuthor.addEventListener('change', applyFilters);
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

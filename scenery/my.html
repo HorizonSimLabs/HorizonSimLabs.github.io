@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>马来西亚地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
+    #map { width: 100%; height: 100%; }
+    #my-tooltip {
+      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
+      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
+    }
+    .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
+    .my-link:hover { text-decoration: underline; }
+    .ui-btn {
+      position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 9999; text-decoration: none;
+      backdrop-filter: blur(10px); transition: 0.3s;
+    }
+    .ui-btn:hover { background: #3b82f6; border-color: #3b82f6; }
+    #back-btn { left: 15px; }
+    #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
+    #lang-btn:hover { background: #059669; }
+    #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
+    @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
+  </style>
+</head>
+<body>
+  <div id="loading-tip">正在加载真实马来西亚地图...</div>
+  <a href="../scenery.html" id="back-btn" class="ui-btn">← 返回全球</a>
+  <button id="lang-btn" class="ui-btn">Switch to English</button>
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+
+  <script>
+    const tooltipEl = document.getElementById('my-tooltip');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
+    };
+
+    const myNameDict = { 
+      'Johor': { zh: '柔佛', en: 'Johor' }, 'Kedah': { zh: '吉打', en: 'Kedah' }, 
+      'Kelantan': { zh: '吉兰丹', en: 'Kelantan' }, 'Malacca': { zh: '马六甲', en: 'Malacca' }, 
+      'Negeri Sembilan': { zh: '森美兰', en: 'Negeri Sembilan' }, 'Pahang': { zh: '彭亨', en: 'Pahang' }, 
+      'Perak': { zh: '霹雳', en: 'Perak' }, 'Perlis': { zh: '玻璃市', en: 'Perlis' }, 
+      'Selangor': { zh: '雪兰莪', en: 'Selangor' }, 'Terengganu': { zh: '登嘉楼', en: 'Terengganu' }, 
+      'Sabah': { zh: '沙巴', en: 'Sabah' }, 'Sarawak': { zh: '砂拉越', en: 'Sarawak' }, 
+      'Kuala Lumpur': { zh: '吉隆坡', en: 'Kuala Lumpur' }, 
+      'Labuan': { zh: '纳闽', en: 'Labuan' }, 
+      'Putrajaya': { zh: '布城', en: 'Putrajaya' }
+    };
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      return currentLang === 'zh' ? parts[0].trim() : (parts[1] || parts[0]).trim();
+    }
+
+    function buildItemHtml(name, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+
+      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;color:#0f172a;">【${name}】</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
+      }
+
+      if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
+      if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
+      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
+      
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+    let klData = null;
+    let pgData = null;
+
+    async function fetchData() {
+      try {
+        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          let text = (await doneRes.text()).replace(/[\[\]"'\r\n]/g, '').trim();
+          text.split(',').forEach(line => {
+            let rawLine = line.trim().replace(/；/g, ';');
+            if (!rawLine) return;
+            const parts = rawLine.split(';');
+            const rawProvince = parts[0].trim();
+            
+            const dataObj = {
+              author: parts[1] || '未知',
+              freeLink: parts[2] || '', freeLevel: parts[3] || '',
+              paidLink: parts[4] || '', paidLevel: parts[5] || '',
+              remark: parts[6] || ''
+            };
+
+            // 寻找吉隆坡和槟城的数据
+            if (rawProvince === '吉隆坡') klData = dataObj;
+            if (rawProvince === '槟城') pgData = dataObj;
+          });
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
+    }
+
+    // 官方解码算法
+    function decodeGeoJson(encodedGeoJson) {
+      if (!encodedGeoJson.UTF8Encoding) return encodedGeoJson;
+      const decodePolygon = (coordinate, encodeOffsets) => {
+        const result = [];
+        let prevX = encodeOffsets[0];
+        let prevY = encodeOffsets[1];
+        for (let i = 0; i < coordinate.length; i += 2) {
+          let x = coordinate.charCodeAt(i) - 64;
+          let y = coordinate.charCodeAt(i + 1) - 64;
+          x = (x >> 1) ^ (-(x & 1));
+          y = (y >> 1) ^ (-(y & 1));
+          x += prevX;
+          y += prevY;
+          prevX = x;
+          prevY = y;
+          result.push([x / 1024, y / 1024]);
+        }
+        return result;
+      };
+      
+      const newFeatures = encodedGeoJson.features.map(feature => {
+        const geometry = feature.geometry;
+        let newCoordinates = [];
+        if (geometry.type === 'Polygon') {
+          newCoordinates = geometry.coordinates.map((polygon, i) => decodePolygon(polygon, geometry.encodeOffsets[i]));
+        } else if (geometry.type === 'MultiPolygon') {
+          newCoordinates = geometry.coordinates.map((polygonArray, i) => {
+            return polygonArray.map((ring, j) => decodePolygon(ring, geometry.encodeOffsets[i][j]));
+          });
+        }
+        return { type: 'Feature', properties: feature.properties, geometry: { type: geometry.type, coordinates: newCoordinates } };
+      });
+      return { type: 'FeatureCollection', features: newFeatures };
+    }
+
+    async function renderMap() {
+      myChart.showLoading();
+      try {
+        // 读取 GeoJSON 目录下的高精度地图文件
+        const res = await fetch('../GeoJSON/Malaysia.json'); 
+        if (!res.ok) throw new Error("找不到 GeoJSON/Malaysia.json");
+        let realGeoJson = await res.json();
+        
+        // 解码
+        realGeoJson = decodeGeoJson(realGeoJson);
+        echarts.registerMap('malaysia', realGeoJson);
+        
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+
+        features.forEach(featureName => {
+          // ★ 核心逻辑：如果 `done.json` 里有吉隆坡或槟城，就把雪兰莪（Selangor）强行染绿！
+          // 因为那个底图里只有雪兰莪，没有吉隆坡的独立轮廓
+          if ((klData || pgData) && featureName === 'Selangor') {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+          }
+        });
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'malaysia', 
+            roam: true,
+            zoom: 1.2,
+            label: { 
+              show: true, 
+              fontSize: isMobile ? 8 : 10, 
+              color: '#333',
+              formatter: function (params) { 
+                // 如果是雪兰莪，我们可以把标签显示为更直观的文字
+                if (params.name === 'Selangor' && (klData || pgData)) return '吉隆坡 / 槟城';
+                return myNameDict[params.name] ? myNameDict[params.name].zh : params.name; 
+              }
+            }, 
+            itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+            selectedMode: false, 
+            emphasis: { itemStyle: { areaColor: 'inherit' } },
+            data: mapData
+          }]
+        });
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        document.getElementById('loading-tip').innerHTML = '加载失败：' + e.message;
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+
+    async function initApp() { 
+      updateUI(); 
+      await fetchData(); 
+      renderMap(); 
+    }
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI(); await fetchData(); renderMap();
+    });
+
+    // 悬浮与点击交互
+    if (!isMobile) {
+      let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+      myChart.on('mouseover', function (params) {
+        if (params.name === 'Selangor' && (klData || pgData)) {
+          if (isOverBox || currentHoverName === params.name) return;
+          clearTimeout(hideTimer); currentHoverName = params.name;
+          
+          // 拼接上下两个信息
+          let combinedHtml = '';
+          if (klData) combinedHtml += buildItemHtml('吉隆坡', klData.author, klData.freeLink, klData.freeLevel, klData.paidLink, klData.paidLevel, klData.remark);
+          if (klData && pgData) combinedHtml += `<hr style="border:none; border-top:1px dashed #ccc; margin:10px 0;"/>`;
+          if (pgData) combinedHtml += buildItemHtml('槟城', pgData.author, pgData.freeLink, pgData.freeLevel, pgData.paidLink, pgData.paidLevel, pgData.remark);
+
+          tooltipEl.innerHTML = combinedHtml;
+          tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+          if (params.event && params.event.event) {
+            const e = params.event.event;
+            let x = e.clientX + 20; let y = e.clientY - 20;
+            if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+            if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+            if (y < 10) y = 10;
+            tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+          }
+        }
+      });
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+      });
+      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+    }
+
+    myChart.on('click', function(params) {
+      if (isMobile && params.name === 'Selangor' && (klData || pgData)) {
+        let combinedHtml = '';
+        if (klData) combinedHtml += buildItemHtml('吉隆坡', klData.author, klData.freeLink, klData.freeLevel, klData.paidLink, klData.paidLevel, klData.remark);
+        if (klData && pgData) combinedHtml += `<hr style="border:none; border-top:1px dashed #ccc; margin:10px 0;"/>`;
+        if (pgData) combinedHtml += buildItemHtml('槟城', pgData.author, pgData.freeLink, pgData.freeLevel, pgData.paidLink, pgData.paidLevel, pgData.remark);
+        
+        tooltipEl.innerHTML = combinedHtml;
+        tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+      }
+    });
+    
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) tooltipEl.style.display = 'none';
+    });
+
+    window.addEventListener('resize', () => myChart.resize());
+  </script>
+</body>
+</html>
