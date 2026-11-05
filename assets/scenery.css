@@ -1,0 +1,120 @@
+/* ==========================================================================
+   HorizonSimLabs — 国家地景页共享样式
+   配合 assets/theme.css 使用；页面只需在自己的 <style> 里保留数据相关的少量样式
+   ========================================================================== */
+
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+
+body.scenery-page { background: transparent; }
+#map { width: 100%; height: 100%; position: relative; z-index: 1; }
+
+/* ---------- 顶部浮动按钮 ---------- */
+#back-btn { left: 16px; }
+.scenery-topright { position: fixed; top: 16px; right: 16px; z-index: 10000; display: flex; align-items: center; gap: 10px; }
+#lang-btn { position: static; }
+body.scenery-page .hsl-chip { top: auto; }
+
+/* ---------- 悬浮信息卡 ---------- */
+#my-tooltip {
+  position: fixed; z-index: 99999; display: none;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(72vh, 560px); overflow-y: auto; overscroll-behavior: contain;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+  font-size: .86rem; line-height: 1.7;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  animation: hsl-tip-in .2s ease;
+  scrollbar-width: thin;
+}
+@keyframes hsl-tip-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+#my-tooltip::-webkit-scrollbar { width: 6px; }
+#my-tooltip::-webkit-scrollbar-thumb { background-color: rgba(120,160,240,.4); border: 0; }
+
+/* 卡片内部结构（由 buildHtml 生成） */
+#my-tooltip .tip-title {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .98rem; font-weight: 800; letter-spacing: .02em;
+  color: var(--text); margin-bottom: 10px; padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+#my-tooltip .tip-title::before {
+  content: ""; width: 4px; height: 15px; border-radius: 3px; background: var(--grad-brand); flex: 0 0 auto;
+}
+#my-tooltip .tip-row { display: flex; gap: 6px; margin-top: 4px; color: var(--text-dim); }
+#my-tooltip .tip-row b { color: var(--text); font-weight: 700; }
+#my-tooltip .tip-sub {
+  margin: 4px 0 4px 12px; padding: 7px 10px; border-radius: 9px;
+  background: var(--panel-sunken); border: 1px solid var(--line);
+  font-size: .82rem; color: var(--text-dim);
+}
+#my-tooltip .tip-sub .lv { color: var(--text); font-weight: 700; }
+#my-tooltip .tip-remark {
+  margin-top: 10px; padding-top: 9px; border-top: 1px dashed var(--line);
+  font-size: .78rem; line-height: 1.65; color: var(--text-mute); white-space: normal;
+}
+#my-tooltip .tip-hr {
+  margin: 12px 0; border: none; border-top: 1px dashed var(--line);
+}
+#my-tooltip hr {
+  border: none; border-top: 1px dashed var(--line); margin: 12px 0;
+}
+#my-tooltip .my-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: .78rem; font-weight: 800; text-decoration: none;
+  color: #fff; background: var(--grad-brand);
+  box-shadow: 0 4px 12px rgba(77, 141, 255, .32);
+  transition: transform .2s var(--ease), box-shadow .2s ease;
+}
+#my-tooltip .my-link:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(77, 141, 255, .45); }
+#my-tooltip .tip-none { color: var(--text-mute); font-weight: 700; }
+
+/* ---------- 加载 / 错误提示 ---------- */
+#loading-tip {
+  position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+  z-index: 50; display: none; align-items: center; gap: 10px;
+  padding: 10px 18px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel);
+  color: var(--text-dim); font-size: .85rem;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+}
+#loading-tip.is-error {
+  display: inline-flex; color: var(--red);
+  border-color: color-mix(in srgb, var(--red) 45%, transparent);
+}
+#loading-tip .spin {
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--line-strong); border-top-color: var(--brand);
+  animation: hsl-spin .8s linear infinite;
+}
+@keyframes hsl-spin { to { transform: rotate(360deg); } }
+
+/* ---------- 图例 ---------- */
+.scenery-legend {
+  position: fixed; left: 16px; bottom: 16px; z-index: 40;
+  display: flex; align-items: center; gap: 14px;
+  padding: 8px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  font-size: .76rem; color: var(--text-dim);
+}
+.scenery-legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+.scenery-legend i.on { background: var(--map-lit); box-shadow: 0 0 10px var(--map-lit); }
+.scenery-legend i.off { background: var(--map-area); border: 1px solid var(--map-border); }
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 768px) {
+  .scenery-legend { display: none; }
+  #my-tooltip {
+    width: calc(100vw - 24px); left: 12px !important; right: 12px;
+    max-height: 60vh; font-size: .84rem;
+  }
+  .hsl-chip { padding: 8px 13px; font-size: .82rem; }
+}

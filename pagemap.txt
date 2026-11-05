@@ -1,0 +1,64 @@
+﻿===== jp =====
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+myChart.showLoading();
+// 鍦板浘鏁版嵁鏉ヨ嚜绔欑偣鏍圭洰褰曠殑 GeoJSON 鏂囦欢澶?        const realGeoJson = await HSLGeo.loadGeoJson('Japan.json');
+echarts.registerMap('japan', realGeoJson);
+===== my =====
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+myChart.showLoading();
+const realGeoJson = await HSLGeo.loadGeoJson('Malaysia.json');
+echarts.registerMap('malaysia', realGeoJson);
+===== nz =====
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+myChart.showLoading();
+const realGeoJson = await HSLGeo.loadGeoJson('New_Zealand.json');
+echarts.registerMap('newzealand', realGeoJson);
+===== tr =====
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+myChart.showLoading();
+// 鍦板浘鏁版嵁鏉ヨ嚜绔欑偣鏍圭洰褰曠殑 GeoJSON 鏂囦欢澶?        const realGeoJson = await HSLGeo.loadGeoJson('Turkey.json');
+echarts.registerMap('turkey', realGeoJson);
+===== bt =====
+const BHUTAN_GEOJSON_URLS = [
+for (const url of BHUTAN_GEOJSON_URLS) {
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+const res = await fetch(url);
+myChart.showLoading();
+echarts.registerMap('bhutan', realGeoJson);
+===== kp =====
+const KOREA_GEOJSON_URLS = [
+for (const url of KOREA_GEOJSON_URLS) {
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+const res = await fetch(url);
+myChart.showLoading();
+echarts.registerMap('northkorea', realGeoJson);
+===== dk =====
+const DENMARK_GEOJSON_URLS = [
+for (const url of DENMARK_GEOJSON_URLS) {
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+const res = await fetch(url);
+myChart.showLoading();
+echarts.registerMap('denmark', realGeoJson);
+===== sg =====
+const SINGAPORE_GEOJSON_URLS = [
+for (const url of SINGAPORE_GEOJSON_URLS) {
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+const res = await fetch(url);
+myChart.showLoading();
+echarts.registerMap('singapore', realGeoJson);
+===== kr =====
+// 鈽?闊╁浗瑕佺殑鏄€岀渷绾э紙閬?/ 骞垮煙甯傦級銆嶅垎鍖鸿疆寤擄紝world.json 閲岄煩鍥藉彧鏈変竴鏁村潡锛?    //   鎵€浠ヤ紭鍏堣鍙?GeoJSON/South_Korea.json锛屾湰鍦版病鏈夊啀鍥為€€鍒板湪绾垮垎鍖烘暟鎹簮銆?    const KOREA_GEOJSON_URLS = [
+for (const url of KOREA_GEOJSON_URLS) {
+const myChart = echarts.init(document.getElementById('map'));
+let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+const res = await fetch(url);
+myChart.showLoading();
+echarts.registerMap('korea', realKrGeoJson);

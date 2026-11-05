@@ -96,12 +96,11 @@
       '塔恩比': 'Tårnby Kommune', 'Taarnby': 'Tårnby Kommune',
       '灵比': 'Lyngby-Taarbæk Municipality', 'Lyngby': 'Lyngby-Taarbæk Municipality',
 
-      // ★ 比隆不在首都圈那 29 个市镇里，但它所在的「南丹麦大区 / 中日德兰」没有轮廓数据，
-      //   所以这里把比隆挂到比隆实际所在的比隆市镇（Billund Kommune）；
-      //   如果底图里没有这个市镇，会退回到「最近的一个市镇」，保证至少有一块亮起来。
-      '比隆': 'Billund Municipality', 'Billund': 'Billund Municipality',
-      '乐高': 'Billund Municipality', 'Lego': 'Billund Municipality',
-      '乐高乐园': 'Billund Municipality',
+      // ★ 比隆（Billund）在日德兰半岛南部，不在底图那 29 个市镇里。
+      //   底图里没有 Billund 的轮廓，所以这里不能把它硬映射到某个市镇名
+      //   （否则 resolveDkTarget 第 1 步就"找到"了一个不存在的市镇，后面的就近兜底根本不会执行），
+      //   而是交给经纬度就近兜底：见下面的 fallbackTarget / billundMunicipality。
+      '比隆': '', 'Billund': '', '乐高': '', 'Lego': '', '乐高乐园': '', 'Billund Kommune': '',
 
       // 其他常见城市 → 就近的首都圈市镇（底图只有首都圈时才用得上）
       '欧登塞': 'Copenhagen Municipality', 'Odense': 'Copenhagen Municipality',
@@ -166,6 +165,7 @@
 
     // 底图市镇的中心点（用范围中心近似）
     const dkFeatureCenter = {};
+    let dkBillundTarget = '';
 
     // Denmark.json 是 ECharts 的压缩格式（UTF8Encoding: true），坐标是编码过的字符串，
     // 直接遍历拿不到经纬度，这里先按官方算法解压
@@ -255,15 +255,39 @@
       if (mapped && dkFeatureCenter[mapped]) return mapped;
       // 2) 名字本身就在底图里
       if (dkFeatureCenter[rawProvince]) return rawProvince;
-      // 3) 用经纬度找最近的市镇
+      // 3) 本页额外准备的兜底市镇（例如比隆 → 底图里离它最近的那块）
+      const fallback = fallbackTarget(rawProvince);
+      if (fallback) return fallback;
+      // 4) 用经纬度找最近的市镇
       const near = nearestMunicipality(rawProvince);
       if (near) return near;
-      // 4) 映射名不在底图里时，也试试经纬度
+      // 5) 映射名不在底图里时，也试试经纬度
       if (mapped) {
         const nearMapped = nearestMunicipality(stripSuffix(mapped));
         if (nearMapped) return nearMapped;
       }
       return null;
+    }
+
+    // ★ 底图里没有轮廓、但用户确实有地景的地点（目前只有比隆）。
+    //   这些地点按经纬度落到「离它最近的已有市镇」上，并且该市镇的卡片标题直接写用户要的名字，
+    //   这样 hover 上看到的是「【比隆】」以及比隆自己的数据，不会变成某个不相干的市镇。
+    const DK_OFFMAP_PLACES = ['比隆', 'Billund', 'Billund Kommune', '乐高', 'Lego', '乐高乐园'];
+
+    function fallbackTarget(rawProvince) {
+      const raw = String(rawProvince || '').trim();
+      if (!raw) return null;
+      const aliased = dkAlias[raw];
+      const name = (aliased && dkFeatureCenter[aliased]) ? aliased : raw;
+      if (DK_OFFMAP_PLACES.indexOf(name) < 0) return null;
+      return billundMunicipality();
+    }
+
+    // 比隆市镇的真实位置（8.90E, 55.73N）→ 底图里最近的市镇
+    function billundMunicipality() {
+      if (dkBillundTarget) return dkBillundTarget;
+      dkBillundTarget = nearestMunicipality('比隆') || nearestMunicipality('Billund');
+      return dkBillundTarget;
     }
 
     function parseBilingual(text) {
@@ -282,10 +306,13 @@
       const parsedFreeLink = parseBilingual(freeLink);
       const parsedPaidLink = parseBilingual(paidLink);
 
+      // ★ 底图里没有轮廓的地点（如比隆）借用了某个市镇的色块，
+      //   但卡片标题必须写用户要的地点名，并且不再显示那个市镇的原名，避免误导
+      const offMap = DK_OFFMAP_PLACES.indexOf(String(rawProvince).trim()) >= 0;
       const titleName = getTranslatedName(rawProvince);
 
       let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      if (titleName !== rawProvince) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
+      if (!offMap && titleName !== rawProvince) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
       html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
       html += `<div>${t.download}</div>`;
       
@@ -357,13 +384,12 @@
           // ★ 按行解析，避免备注里的英文逗号把条目切断
           const entries = parseDoneJson(await doneRes.text());
           entries.forEach(entry => {
-            const rawProvince = entry.rawProvince;
             allParsedData.push({
-              rawProvince: rawProvince,
-              author: parts[1] || t.unknown,
-              freeLink: parts[2] || '', freeLevel: parts[3] || '',
-              paidLink: parts[4] || '', paidLevel: parts[5] || '',
-              remark: parts[6] || ''
+              rawProvince: entry.rawProvince,
+              author: entry.author || t.unknown,
+              freeLink: entry.freeLink || '', freeLevel: entry.freeLevel || '',
+              paidLink: entry.paidLink || '', paidLevel: entry.paidLevel || '',
+              remark: entry.remark || ''
             });
           });
         }

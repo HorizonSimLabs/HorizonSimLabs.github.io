@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>不丹地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <meta name="color-scheme" content="dark light" />
+  <script src="../assets/theme.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css">
+  <link rel="stylesheet" href="../assets/scenery.css">
+
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <script>
+    if (!window.echarts) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+
+  <script src="../assets/map-style.js"></script>
+</head>
+<body class="scenery-page">
+  <div id="loading-tip">正在加载不丹地图...</div>
+  <a href="../scenery.html" id="back-btn" class="hsl-chip">← 返回全球</a>
+  <div class="scenery-topright">
+
+    <button id="lang-btn" class="hsl-chip hsl-chip--accent">Switch to English</button>
+
+    <button class="hsl-theme-toggle" data-theme-toggle></button>
+
+  </div>
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+
+  <script>
+    const tooltipEl = document.getElementById('my-tooltip');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
+    // ==================== 地图配色（跟随深色 / 浅色主题） ====================
+    function cssVar(name, fallback) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      v = (v || '').trim();
+      return v || fallback;
+    }
+
+    function mapSeriesStyle(opt) {
+      opt = opt || {};
+      const c = {
+        area: cssVar('--map-area', '#e8ecf1'),
+        border: cssVar('--map-border', '#ffffff'),
+        label: cssVar('--map-label', '#333'),
+        litEdge: cssVar('--map-lit-edge', '#ffffff'),
+        hover: cssVar('--map-hover', '#cbd9ef')
+      };
+      return {
+        itemStyle: { areaColor: c.area, borderColor: c.border, borderWidth: 1 },
+        emphasis: {
+          itemStyle: { areaColor: c.hover, borderColor: c.litEdge, borderWidth: 1.4 },
+          label: { show: true, color: c.label }
+        },
+        label: { show: !!opt.labelShow, fontSize: opt.fontSize || 10, color: c.label }
+      };
+    }
+
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
+    };
+
+    // ★ 以 GeoJSON/Bhutan.json 里的 20 个宗（Districts）名称为主键
+    const btMapDict = {
+      'Bumthang District': { zh: '布姆唐宗', en: 'Bumthang' },
+      'Chukha District': { zh: '楚卡宗', en: 'Chukha' },
+      'Dagana District': { zh: '达加纳宗', en: 'Dagana' },
+      'Gasa District': { zh: '加萨宗', en: 'Gasa' },
+      'Haa District': { zh: '哈阿宗', en: 'Haa' },
+      'Lhuntse District': { zh: '伦奇宗', en: 'Lhuntse' },
+      'Mongar District': { zh: '蒙加尔宗', en: 'Mongar' },
+      'Paro District': { zh: '帕罗宗', en: 'Paro' },
+      'Pemagatshel District': { zh: '佩马加策尔宗', en: 'Pemagatshel' },
+      'Punakha District': { zh: '普那卡宗', en: 'Punakha' },
+      'Samdrup Jongkhar District': { zh: '萨姆德鲁琼卡尔宗', en: 'Samdrup Jongkhar' },
+      'Samtse District': { zh: '萨姆奇宗', en: 'Samtse' },
+      'Sarpang District': { zh: '萨潘宗', en: 'Sarpang' },
+      'Thimphu District': { zh: '廷布宗', en: 'Thimphu' },
+      'Trashigang District': { zh: '塔希冈宗', en: 'Trashigang' },
+      'Trashiyangtse District': { zh: '塔希央奇宗', en: 'Trashiyangtse' },
+      'Trongsa District': { zh: '通萨宗', en: 'Trongsa' },
+      'Tsirang District': { zh: '奇朗宗', en: 'Tsirang' },
+      'Wangdue Phodrang District': { zh: '旺杜波德朗宗', en: 'Wangdue Phodrang' },
+      'Zhemgang District': { zh: '泽姆冈宗', en: 'Zhemgang' }
+    };
+
+    // 中文译名 → 底图主键
+    const btZhToKey = {};
+    for (let k in btMapDict) {
+      if (!btZhToKey[btMapDict[k].zh]) btZhToKey[btMapDict[k].zh] = k;
+    }
+
+    // 常见城市 → 所属宗（done.json 里写城市也能点亮对应宗，悬停仍显示原始条目）
+    const btAlias = {
+      '廷布': 'Thimphu District', 'Thimphu': 'Thimphu District', 'Thimpu': 'Thimphu District',
+      '帕罗': 'Paro District', 'Paro': 'Paro District', '帕罗机场': 'Paro District', 'Paro Airport': 'Paro District',
+      '普那卡': 'Punakha District', 'Punakha': 'Punakha District',
+      '旺杜': 'Wangdue Phodrang District', 'Wangdue': 'Wangdue Phodrang District',
+      '通萨': 'Trongsa District', 'Trongsa': 'Trongsa District',
+      '宗萨': 'Trongsa District',
+      '布姆唐': 'Bumthang District', 'Bumthang': 'Bumthang District',
+      '加萨': 'Gasa District', 'Gasa': 'Gasa District',
+      '楚卡': 'Chukha District', 'Phuentsholing': 'Chukha District', '彭措林': 'Chukha District',
+      '哈阿': 'Haa District', 'Haa': 'Haa District',
+      '蒙加尔': 'Mongar District', 'Mongar': 'Mongar District',
+      '塔希冈': 'Trashigang District', 'Trashigang': 'Trashigang District',
+      '塔希央奇': 'Trashiyangtse District', 'Trashiyangtse': 'Trashiyangtse District',
+      '泽姆冈': 'Zhemgang District', 'Zhemgang': 'Zhemgang District',
+      '萨姆德鲁琼卡尔': 'Samdrup Jongkhar District', 'Samdrup Jongkhar': 'Samdrup Jongkhar District',
+      '萨姆奇': 'Samtse District', 'Samtse': 'Samtse District',
+      '萨潘': 'Sarpang District', 'Sarpang': 'Sarpang District',
+      '达加纳': 'Dagana District', 'Dagana': 'Dagana District',
+      '奇朗': 'Tsirang District', 'Tsirang': 'Tsirang District',
+      '佩马加策尔': 'Pemagatshel District', 'Pemagatshel': 'Pemagatshel District',
+      '伦奇': 'Lhuntse District', 'Lhuntse': 'Lhuntse District'
+      // 注意：不要给「不丹 / Bhutan」这种国家级名字加映射，
+      // 否则写一条国家级数据就会点亮某一个宗，造成误解。
+    };
+
+    function stripSuffix(name) {
+      return String(name || '')
+        .replace(/\s*(District|Dzongkhag)$/i, '')
+        .trim();
+    }
+
+    function getTranslatedName(rawName) {
+      const key = findDictKey(rawName);
+      if (key && btMapDict[key] && currentLang === 'zh') return btMapDict[key].zh;
+      return stripSuffix(rawName);
+    }
+
+    function findDictKey(name) {
+      const raw = String(name || '').trim();
+      if (btMapDict[raw]) return raw;
+      const s = stripSuffix(raw);
+      for (let k in btMapDict) {
+        if (k === raw || stripSuffix(k) === s) return k;
+        if (btMapDict[k].zh === raw) return k;
+      }
+      return null;
+    }
+
+    // 把底图名 / done.json 名统一成可比较的键（严格匹配，避免国家级名字把所有宗都点亮）
+    function cleanBtName(name) {
+      if (!name) return '';
+      const raw = String(name).trim();
+
+      const direct = findDictKey(raw);
+      if (direct) return direct;
+
+      if (btAlias[raw]) return btAlias[raw];
+
+      // 中文 → 底图主键
+      for (let k in btMapDict) {
+        if (btMapDict[k].zh === raw || raw.indexOf(btMapDict[k].zh) === 0) return k;
+      }
+
+      return stripSuffix(raw);
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      if (currentLang === 'zh') return parts[0].trim();
+      return (parts[1] || parts[0]).trim();
+    }
+
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+
+      const key = cleanBtName(rawProvince);
+      const titleName = btMapDict[key] ? getTranslatedName(key) : rawProvince;
+
+      let html = `<div class="tip-title">${titleName}</div>`;
+      if (titleName !== rawProvince) html += `<div class="tip-sub">(${rawProvince})</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:var(--text-dim); font-weight:bold;">${link}</span>`;
+      }
+
+      if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
+      if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
+      if (displayRemark) html += `<div class="tip-remark">${t.remark}${displayRemark}</div>`;
+      
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+    let allParsedData = [];
+    const provinceDataMap = {};
+
+    // ==================== done.json 解析 ====================
+    // ★ 必须按「行」解析。
+    //   done.json 里很多备注带英文逗号，例如
+    //     "...;属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG"
+    //   如果用 split(',') 切，这一条会被切成两段，正则再去掉引号和换行后，
+    //   相邻两行就会粘在一起，产生不存在的"城市"、并截断备注。
+    function parseDoneJson(rawText) {
+      const result = [];
+      if (!rawText) return result;
+
+      const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+
+      body.split(/\r?\n/).forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        // 逐行剥掉 JSON 数组的行尾逗号与首尾引号（不会被正文里的逗号影响）
+        l = l.replace(/,\s*$/, '').trim();
+        l = l.replace(/^"/, '').replace(/"$/, '').trim();
+        if (!l) return;
+
+        l = l.replace(/；/g, ';');   // 兼容中文分号
+
+        const parts = l.split(';');
+        const rawProvince = (parts[0] || '').trim();
+        if (!rawProvince) return;
+
+        // 备注里可能还有分号，全部并入备注
+        const remark = parts.length > 6 ? parts.slice(6).join(';') : (parts[6] || '');
+
+        result.push({
+          rawProvince: rawProvince,
+          author: parts[1] || i18n[currentLang].unknown,
+          freeLink: parts[2] || '', freeLevel: parts[3] || '',
+          paidLink: parts[4] || '', paidLevel: parts[5] || '',
+          remark: remark
+        });
+      });
+
+      return result;
+    }
+
+    async function fetchData() {
+      allParsedData = [];
+      const t = i18n[currentLang];
+      try {
+        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          // ★ 按行解析，避免备注里的英文逗号把条目切断
+          allParsedData = parseDoneJson(await doneRes.text());
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
+    }
+
+
+    async function renderMap() {
+      myChart.showLoading();
+      try {
+        const realGeoJson = await (async () => {
+          const res = await fetch(`../GeoJSON/Bhutan.json`);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return await res.json();
+        })();
+        echarts.registerMap('bhutan', realGeoJson);
+
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
+        // 逐个宗匹配 done.json —— 严格相等，短名字不能误匹配一大片
+        features.forEach(featureName => {
+          const cleanFeature = cleanBtName(featureName);
+          const items = allParsedData.filter(item => cleanBtName(item.rawProvince) === cleanFeature);
+
+          if (items.length > 0) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+            provinceDataMap[featureName] = items
+              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
+              .join('<hr class="tip-hr" />');
+          }
+        });
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+
+        myChart.setOption({
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'bhutan',
+            roam: true,
+            zoom: 1.2,
+            label: Object.assign({}, style.label, {
+              formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+            }),
+            itemStyle: style.itemStyle,
+            selectedMode: false,
+            emphasis: style.emphasis,
+            data: mapData
+          }]
+          });
+
+          } catch (e) {
+          console.error("地图加载失败", e);
+          myChart.hideLoading();
+          const tipEl = document.getElementById('loading-tip');
+                tipEl.classList.add('is-error');
+          tipEl.style.display = 'inline-flex';
+          tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+          }
+          }
+
+          function updateUI() {
+          document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+          document.getElementById('back-btn').innerText = i18n[currentLang].back;
+          }
+
+          async function initApp() { updateUI(); await fetchData(); renderMap(); }
+          initApp();
+
+          document.getElementById('lang-btn').addEventListener('click', async () => {
+          currentLang = currentLang === 'zh' ? 'en' : 'zh';
+          updateUI(); await fetchData(); renderMap();
+          });
+
+          if (!isMobile) {
+          let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+          myChart.on('mouseover', function (params) {
+          if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+          clearTimeout(hideTimer); currentHoverName = params.name;
+          tooltipEl.innerHTML = provinceDataMap[params.name];
+          tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+          if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20; let y = e.clientY - 20;
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
+          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+          }
+          });
+          myChart.on('mouseout', function () {
+          hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+          });
+          tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+          tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+          }
+
+          myChart.on('click', function(params) {
+          if (isMobile && provinceDataMap[params.name]) {
+          tooltipEl.innerHTML = provinceDataMap[params.name];
+          tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+          tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+          }
+          });
+    
+          myChart.getZr().on('click', function (event) {
+          if (isMobile && !event.target) tooltipEl.style.display = 'none';
+          });
+
+          window.addEventListener('resize', () => myChart.resize());
+          </script>
+          </body>
+          </html>

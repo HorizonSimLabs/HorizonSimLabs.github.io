@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>冰岛地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <meta name="color-scheme" content="dark light" />
+  <script src="../assets/theme.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css">
+  <link rel="stylesheet" href="../assets/scenery.css">
+
+  <!-- 只加载 ECharts 库本身；地图数据全部来自本地 ../GeoJSON/Iceland.json -->
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script>
+    if (!window.echarts) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+  <script src="../assets/map-style.js"></script>
+</head>
+<body class="scenery-page">
+  <a href="../scenery.html" id="back-btn" class="hsl-chip">← 返回全球</a>
+  <div class="scenery-topright">
+
+    <button id="lang-btn" class="hsl-chip hsl-chip--accent">Switch to English</button>
+
+    <button class="hsl-theme-toggle" data-theme-toggle></button>
+
+  </div>
+
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+  <div id="loading-tip">正在加载冰岛地图…</div>
+
+  <script>
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: {
+        back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版",
+        remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知",
+        langBtn: "Switch to English", backCountry: "← 返回冰岛"
+      },
+      en: {
+        back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version",
+        remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown",
+        langBtn: "切换到中文", backCountry: "← Back to Iceland"
+      }
+    };
+
+    // 冰岛八大区（GeoJSON/Iceland.json 里的 name → 中文）
+    const REGION_ZH = {
+      'Capital Region': '首都区',
+      'Eastern Region': '东部区',
+      'Northeastern Region': '东北区',
+      'Northwestern Region': '西北区',
+      'Southern Peninsula': '南半岛区',
+      'Southern Region': '南部区',
+      'Western Region': '西部区',
+      'Westfjords': '西峡湾区'
+    };
+
+    // done.json 里可能出现的地名 → 所属大区
+    const PLACE_TO_REGION = {
+      '雷克雅未克': 'Capital Region',
+      '凯夫拉维克': 'Southern Peninsula',
+      '阿克雷里': 'Northeastern Region',
+      '埃伊尔斯塔济': 'Eastern Region',
+      '伊萨菲厄泽': 'Westfjords',
+      '维克': 'Southern Region',
+      '博尔加内斯': 'Western Region'
+    };
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = String(text).split('|');
+      if (currentLang === 'zh') return parts[0].trim();
+      return (parts[1] || parts[0]).trim();
+    }
+
+    function buildHtml(author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return `<span class="tip-none">${t.noLink}</span>`;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank" rel="noopener">${t.clickDownload} ↗</a>`;
+        return `<span>${link}</span>`;
+      }
+
+      let html = `<div class="tip-title">${currentLang === 'zh' ? '冰岛' : 'Iceland'}</div>`;
+      html += `<div class="tip-row"><span class="tip-sub">${t.author}</span>${parseBilingual(author) || t.unknown}</div>`;
+      html += `<div class="tip-row"><span class="tip-sub">${t.free}${parseBilingual(freeLevel) ? ' (' + parseBilingual(freeLevel) + ')' : ''}</span>${formatLink(parseBilingual(freeLink))}</div>`;
+      html += `<div class="tip-row"><span class="tip-sub">${t.paid}${parseBilingual(paidLevel) ? ' (' + parseBilingual(paidLevel) + ')' : ''}</span>${formatLink(parseBilingual(paidLink))}</div>`;
+
+      const rmk = parseBilingual(remark);
+      if (rmk && rmk !== '无' && rmk !== 'None') {
+        html += `<hr class="tip-remark"><div class="tip-row"><span class="tip-sub">${t.remark}</span>${rmk}</div>`;
+      }
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+    const backBtn = document.getElementById('back-btn');
+    const langBtn = document.getElementById('lang-btn');
+    const tooltipEl = document.getElementById('my-tooltip');
+    const tipEl = document.getElementById('loading-tip');
+
+    let allData = [];          // done.json 解析结果
+    let icelandRaw = null;     // GeoJSON/Iceland.json 原始（已解压）
+    let currentRegion = null;  // 下钻到的区（null = 全国）
+
+    // ==================== done.json 解析（按行） ====================
+    function parseDoneJson(rawText) {
+      const result = [];
+      if (!rawText) return result;
+
+      const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+
+      body.split(/\r?\n/).forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        l = l.replace(/,\s*$/, '').trim();
+        l = l.replace(/^"/, '').replace(/"$/, '').trim();
+        if (!l) return;
+
+        l = l.replace(/；/g, ';');
+
+        const parts = l.split(';');
+        const rawProvince = (parts[0] || '').trim();
+        if (!rawProvince) return;
+
+        const remark = parts.length > 6 ? parts.slice(6).join(';') : (parts[6] || '');
+
+        result.push({
+          rawProvince: rawProvince,
+          author: parts[1] || i18n[currentLang].unknown,
+          freeLink: parts[2] || '', freeLevel: parts[3] || '',
+          paidLink: parts[4] || '', paidLevel: parts[5] || '',
+          remark: remark
+        });
+      });
+
+      return result;
+    }
+
+    function isIcelandName(name) {
+      const n = String(name || '');
+      return n.includes('冰岛') || n.toLowerCase().includes('iceland') ||
+             Object.keys(PLACE_TO_REGION).some(k => n.includes(k)) ||
+             Object.keys(REGION_ZH).some(k => n.toLowerCase() === k.toLowerCase());
+    }
+
+    async function fetchData() {
+      allData = [];
+      try {
+        const doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          allData = parseDoneJson(await doneRes.text()).filter(item => isIcelandName(item.rawProvince));
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
+    }
+
+    // 某条目属于哪个大区（用于下钻上色）
+    function regionOf(item) {
+      const name = item.rawProvince;
+      if (REGION_ZH[name]) return name;
+      for (const place in PLACE_TO_REGION) {
+        if (name.includes(place)) return PLACE_TO_REGION[place];
+      }
+      // 「冰岛」本身 → 全国
+      if (name.includes('冰岛') || name.toLowerCase().includes('iceland')) return null;
+      return null;
+    }
+
+    function regionLabel(name) {
+      return currentLang === 'zh' ? (REGION_ZH[name] || name) : name;
+    }
+
+    function regionData(name) {
+      return allData.filter(item => regionOf(item) === name);
+    }
+
+    // ==================== 渲染 ====================
+    async function renderMap() {
+      myChart.showLoading({ text: '', maskColor: 'transparent', color: hslBrand() });
+      try {
+        if (!icelandRaw) icelandRaw = await HSLGeo.loadGeoJson('Iceland.json');
+
+        echarts.registerMap('iceland', icelandRaw);
+
+        const colors = HSLGeo.mapColors();
+
+        const style = HSLGeo.mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 9 : 12 });
+
+        const features = icelandRaw.features || [];
+        const mapData = [];
+        const whole = allData.filter(item => regionOf(item) === null);
+
+        features.forEach(f => {
+          const name = f.properties && f.properties.name;
+          if (!name) return;
+          const items = regionData(name);
+          if (currentRegion) {
+            // 下钻视图：只看当前区
+            if (name !== currentRegion) return;
+            mapData.push({ name: name, itemStyle: HSLGeo.areaStyle(items.length ? 'lit' : (whole.length ? 'lit' : 'none'), colors) });
+          } else if (items.length || whole.length) {
+            mapData.push({ name: name, itemStyle: HSLGeo.areaStyle('lit', colors) });
+          }
+        });
+
+        myChart.hideLoading();
+        tipEl.style.display = 'none';
+
+        myChart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'iceland',
+            roam: true,
+            zoom: currentRegion ? 1.15 : 1.6,
+            layoutCenter: currentRegion ? ['50%', '50%'] : undefined,
+            label: Object.assign({}, style.label, {
+              show: !isMobile,
+              formatter: function (params) { return regionLabel(params.name); }
+            }),
+            itemStyle: style.itemStyle,
+            emphasis: style.emphasis,
+            selectedMode: false,
+            data: mapData
+          }]
+        }, true);
+
+        backBtn.style.display = 'inline-flex';
+        backBtn.innerText = currentRegion ? i18n[currentLang].backCountry : i18n[currentLang].back;
+        backBtn.onclick = null; // 由下面的 click 监听统一处理
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        tipEl.style.display = 'block';
+        tipEl.classList.add('is-error');
+        tipEl.innerText = currentLang === 'zh'
+          ? '加载本地 GeoJSON/Iceland.json 失败，请检查文件是否存在。'
+          : 'Failed to load local GeoJSON/Iceland.json.';
+      }
+    }
+
+    function hslBrand() {
+      try { return getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#4d8dff'; }
+      catch (e) { return '#4d8dff'; }
+    }
+
+    function showTooltipAt(html, x, y) {
+      tooltipEl.innerHTML = html;
+      tooltipEl.style.display = 'block';
+      tooltipEl.style.left = x + 'px';
+      tooltipEl.style.top = y + 'px';
+      if (x + tooltipEl.offsetWidth > window.innerWidth) tooltipEl.style.left = (x - tooltipEl.offsetWidth - 40) + 'px';
+      if (y + tooltipEl.offsetHeight > window.innerHeight) tooltipEl.style.top = Math.max(10, window.innerHeight - tooltipEl.offsetHeight - 20) + 'px';
+    }
+
+    function updateUI() {
+      langBtn.innerText = i18n[currentLang].langBtn;
+      backBtn.innerText = currentRegion ? i18n[currentLang].backCountry : i18n[currentLang].back;
+    }
+
+    async function initApp() {
+      updateUI();
+      await fetchData();
+      await renderMap();
+    }
+
+    initApp();
+
+    langBtn.addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI();
+      await fetchData();
+      await renderMap();
+      updateUIChip();
+    });
+
+    // 顶部按钮：下钻时先返回冰岛，否则返回全球
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest && e.target.closest('#back-btn');
+      if (!btn) return;
+      if (currentRegion) {
+        e.preventDefault();
+        currentRegion = null;
+        updateUI();
+        renderMap();
+      }
+    });
+
+    myChart.on('click', function (params) {
+      const name = params.name;
+      const items = regionData(name);
+      const whole = allData.filter(item => regionOf(item) === null);
+
+      if (currentRegion === null && (items.length || whole.length)) {
+        currentRegion = name;
+        updateUI();
+        tooltipEl.style.display = 'none';
+        renderMap();
+        return;
+      }
+
+      const list = currentRegion ? regionData(currentRegion) : items.concat(whole);
+      if (list.length) {
+        const html = list.map(it => buildHtml(it.author, it.freeLink, it.freeLevel, it.paidLink, it.paidLevel, it.remark))
+                         .join('<hr class="tip-remark">');
+        const e = params.event && params.event.event;
+        showTooltipAt(html, e ? e.clientX + 20 : window.innerWidth / 2 - 180, e ? e.clientY - 20 : window.innerHeight / 2 - 150);
+      }
+    });
+
+    document.getElementById('map').addEventListener('click', function (e) {
+      if (!tooltipEl.contains(e.target) && e.target.id === 'map') tooltipEl.style.display = 'none';
+    });
+
+    window.addEventListener('resize', () => myChart.resize());
+
+    if (window.HSLTheme && HSLTheme.onChange) {
+      HSLTheme.onChange(function () { setTimeout(function () { renderMap(); }, 30); });
+    }
+  </script>
+</body>
+</html>

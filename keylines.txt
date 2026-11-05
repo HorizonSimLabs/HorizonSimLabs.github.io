@@ -1,0 +1,122 @@
+﻿===== au (282 lines) =====
+  24:   <div id="loading-tip">姝ｅ湪鍔犺浇鐪熷疄婢冲ぇ鍒╀簹鍦板浘...</div>
+ 114:     const myChart = echarts.init(document.getElementById('map'));
+ 156:     async function fetchData() {
+ 164:       } catch (e) { console.error("璇诲彇 done.json 澶辫触", e); }
+ 167:     async function renderMap() {
+ 170:         // 鍦板浘鏁版嵁鏉ヨ嚜绔欑偣鏍圭洰褰曠殑 GeoJSON 鏂囦欢澶?        const realGeoJson = await HSLGeo.loadGeoJson('Australia.json');
+ 192:             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+ 198:         document.getElementById('loading-tip').style.display = 'none';
+ 200:         const style = HSLGeo.mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+ 203:         myChart.setOption({
+ 211:             label: Object.assign({}, style.label, {
+ 212:               formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+ 214:             itemStyle: style.itemStyle,
+ 216:             emphasis: style.emphasis,
+ 221:       } catch (e) {
+ 224:         document.getElementById('loading-tip').innerHTML = '鍔犺浇鏈湴 GeoJSON/Australia.json 澶辫触锛岃妫€鏌ユ枃浠舵槸鍚﹀瓨鍦ㄣ€?;
+ 228:     function updateUI() {
+ 233:     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+ 234:     // 娣辨祬涓婚鍒囨崲鍚庨噸缁樺湴鍥撅紙閰嶈壊鍙栬嚜涓婚鍙橀噺锛?    if (window.HSLTheme && HSLTheme.onChange) {
+ 235:       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+ 237:     initApp();
+ 250:         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+ 257:           tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+ 261:         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+ 264:       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+ 270:         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+ 271:         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+ 276:       if (isMobile && !event.target) tooltipEl.style.display = 'none';
+===== jp (334 lines) =====
+  24:   <div id="loading-tip">姝ｅ湪鍔犺浇鏃ユ湰鍦板浘...</div>
+ 154:     const myChart = echarts.init(document.getElementById('map'));
+ 196:     async function fetchData() {
+ 204:       } catch (e) { console.error("璇诲彇 done.json 澶辫触", e); }
+ 207:     async function renderMap() {
+ 210:         // 鍦板浘鏁版嵁鏉ヨ嚜绔欑偣鏍圭洰褰曠殑 GeoJSON 鏂囦欢澶?        const realGeoJson = await HSLGeo.loadGeoJson('Japan.json');
+ 244:             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+ 250:         document.getElementById('loading-tip').style.display = 'none';
+ 252:                 const style = HSLGeo.mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+ 255: myChart.setOption({
+ 263:             label: Object.assign({}, style.label, {
+ 264:               formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+ 266:             itemStyle: style.itemStyle,
+ 268:             emphasis: style.emphasis,
+ 273:       } catch (e) {
+ 276:         document.getElementById('loading-tip').innerHTML = '鍔犺浇鏈湴 GeoJSON/Japan.json 澶辫触锛岃妫€鏌ユ枃浠舵槸鍚﹀瓨鍦ㄣ€?;
+ 280:     function updateUI() {
+ 285:     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+ 286:     // 娣辨祬涓婚鍒囨崲鍚庨噸缁樺湴鍥撅紙閰嶈壊鍙栬嚜涓婚鍙橀噺锛?    if (window.HSLTheme && HSLTheme.onChange) {
+ 287:       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+ 289:     initApp();
+ 302:         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+ 309:           tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+ 313:         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+ 316:       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+ 322:         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+ 323:         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+ 328:       if (isMobile && !event.target) tooltipEl.style.display = 'none';
+===== kr (418 lines) =====
+ 188:     const myChart = echarts.init(document.getElementById('map'));
+ 230:     async function fetchData() {
+ 240:       } catch (e) { console.error("璇诲彇 done.json 澶辫触", e); }
+ 252:         } catch (e) { console.warn('闊╁浗鍒嗗尯鏁版嵁璇诲彇澶辫触锛屽皾璇曚笅涓€涓簮锛?, url); }
+ 257:     async function renderMap() {
+ 280:             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+ 289:                 const style = HSLGeo.mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+ 292: myChart.setOption({
+ 300:             // 鈽?鏍稿績淇锛氬湴鍥炬爣绛惧己鍒剁炕璇?            label: Object.assign({}, style.label, {
+ 301:               formatter: function (params) {
+ 305:             itemStyle: style.itemStyle,
+ 307:             emphasis: style.emphasis,
+ 312:       } catch (e) {
+ 315:         const tipEl = document.getElementById('loading-tip');
+ 317:           tipEl.style.display = 'block';
+ 324:     function updateUI() {
+ 329:     async function initApp() {
+ 334:     // 娣辨祬涓婚鍒囨崲鍚庨噸缁樺湴鍥撅紙閰嶈壊鍙栬嚜涓婚鍙橀噺锛?    if (window.HSLTheme && HSLTheme.onChange) {
+ 335:       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+ 338:     initApp();
+ 359:         tooltipEl.style.transform = 'none';
+ 360:         tooltipEl.style.bottom = 'auto';
+ 361:         tooltipEl.style.display = 'block';
+ 372:           tooltipEl.style.left = x + 'px';
+ 373:           tooltipEl.style.top = y + 'px';
+ 380:             tooltipEl.style.display = 'none';
+ 393:         tooltipEl.style.display = 'none';
+ 401:         tooltipEl.style.display = 'block';
+ 402:         tooltipEl.style.left = '50%';
+ 403:         tooltipEl.style.top = 'auto';
+ 404:         tooltipEl.style.bottom = '50px';
+ 405:         tooltipEl.style.transform = 'translateX(-50%)';
+ 411:         tooltipEl.style.display = 'none';
+===== bt (360 lines) =====
+  24:   <div id="loading-tip">姝ｅ湪鍔犺浇涓嶄腹鍦板浘...</div>
+ 180:     const myChart = echarts.init(document.getElementById('map'));
+ 222:     async function fetchData() {
+ 230:       } catch (e) { console.error("璇诲彇 done.json 澶辫触", e); }
+ 243:         } catch (e) { console.warn('涓嶄腹鍒嗗尯鏁版嵁璇诲彇澶辫触锛屽皾璇曚笅涓€涓簮锛?, url); }
+ 248:     async function renderMap() {
+ 265:             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+ 273:         document.getElementById('loading-tip').style.display = 'none';
+ 275:                 const style = HSLGeo.mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+ 278: myChart.setOption({
+ 286:             label: Object.assign({}, style.label, {
+ 287:               formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+ 289:             itemStyle: style.itemStyle,
+ 291:             emphasis: style.emphasis,
+ 296:       } catch (e) {
+ 299:         const tipEl = document.getElementById('loading-tip');
+ 301:         tipEl.style.display = 'inline-flex';
+ 306:     function updateUI() {
+ 311:     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+ 312:     // 娣辨祬涓婚鍒囨崲鍚庨噸缁樺湴鍥撅紙閰嶈壊鍙栬嚜涓婚鍙橀噺锛?    if (window.HSLTheme && HSLTheme.onChange) {
+ 313:       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+ 315:     initApp();
+ 328:         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+ 335:           tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+ 339:         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+ 342:       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+ 348:         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+ 349:         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+ 354:       if (isMobile && !event.target) tooltipEl.style.display = 'none';

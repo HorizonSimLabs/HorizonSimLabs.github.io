@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>新加坡地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <meta name="color-scheme" content="dark light" />
+  <script src="../assets/theme.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css">
+  <link rel="stylesheet" href="../assets/scenery.css">
+
+  <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+  <script>
+    if (!window.echarts) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+
+  <script src="../assets/map-style.js"></script>
+</head>
+<body class="scenery-page">
+  <div id="loading-tip">正在加载新加坡地图...</div>
+  <a href="../scenery.html" id="back-btn" class="hsl-chip">← 返回全球</a>
+  <div class="scenery-topright">
+
+    <button id="lang-btn" class="hsl-chip hsl-chip--accent">Switch to English</button>
+
+    <button class="hsl-theme-toggle" data-theme-toggle></button>
+
+  </div>
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+
+  <script>
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
+    // ==================== 地图配色（跟随深色 / 浅色主题） ====================
+    function cssVar(name, fallback) {
+      var v = getComputedStyle(document.documentElement).getPropertyValue(name);
+      v = (v || '').trim();
+      return v || fallback;
+    }
+
+    function mapSeriesStyle(opt) {
+      opt = opt || {};
+      const c = {
+        area: cssVar('--map-area', '#e8ecf1'),
+        border: cssVar('--map-border', '#ffffff'),
+        label: cssVar('--map-label', '#333'),
+        litEdge: cssVar('--map-lit-edge', '#ffffff'),
+        hover: cssVar('--map-hover', '#cbd9ef')
+      };
+      return {
+        itemStyle: { areaColor: c.area, borderColor: c.border, borderWidth: 1 },
+        emphasis: {
+          itemStyle: { areaColor: c.hover, borderColor: c.litEdge, borderWidth: 1.4 },
+          label: { show: true, color: c.label }
+        },
+        label: { show: !!opt.labelShow, fontSize: opt.fontSize || 10, color: c.label }
+      };
+    }
+
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: { back: "← 返回全球", author: "作者：", download: "下载方式：", free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知", langBtn: "Switch to English" },
+      en: { back: "← Back to World", author: "Author: ", download: "Download: ", free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown", langBtn: "切换到中文" }
+    };
+
+    // ★ 新加坡的 5 个社区发展理事会（CDC）区域，对应 GeoJSON/Singapore.json 里的要素
+    const sgMapDict = {
+      'Central Singapore Community Development Council': { zh: '中区', en: 'Central Singapore' },
+      'North East Community Development Council': { zh: '东北区', en: 'North East' },
+      'North West Community Development Council': { zh: '西北区', en: 'North West' },
+      'South East Community Development Council': { zh: '东南区', en: 'South East' },
+      'South West Community Development Council': { zh: '西南区', en: 'South West' }
+    };
+
+    // 新加坡城市/地标 → 所属 CDC 区（需求里说 done.json 会写「新加坡」，
+    // 所以这里主要是给写了具体地点时用的）
+    const sgAlias = {
+      '新加坡': 'Central Singapore Community Development Council',
+      'Singapore': 'Central Singapore Community Development Council',
+      // 具体地点
+      '樟宜': 'South East Community Development Council', '樟宜机场': 'South East Community Development Council',
+      'Changi': 'South East Community Development Council', 'Changi Airport': 'South East Community Development Council',
+      '滨海湾': 'Central Singapore Community Development Council', 'Marina Bay': 'Central Singapore Community Development Council',
+      '裕廊': 'South West Community Development Council', 'Jurong': 'South West Community Development Council',
+      '实里达': 'North East Community Development Council', 'Seletar': 'North East Community Development Council',
+      '兀兰': 'North West Community Development Council', 'Woodlands': 'North West Community Development Council',
+      '榜鹅': 'North East Community Development Council', 'Punggol': 'North East Community Development Council',
+      '巴耶利峇': 'South East Community Development Council', 'Paya Lebar': 'South East Community Development Council',
+      // 5 个 CDC 区的各种写法
+      '中区': 'Central Singapore Community Development Council', 'Central': 'Central Singapore Community Development Council',
+      '东北区': 'North East Community Development Council', 'North East': 'North East Community Development Council',
+      '西北区': 'North West Community Development Council', 'North West': 'North West Community Development Council',
+      '东南区': 'South East Community Development Council', 'South East': 'South East Community Development Council',
+      '西南区': 'South West Community Development Council', 'South West': 'South West Community Development Council'
+    };
+
+    // 「整个新加坡」= done.json 里写 新加坡/Singapore 这种国家级名字
+    const COUNTRY_LEVEL = ['新加坡', 'Singapore', 'Republic of Singapore'];
+
+    function stripSuffix(name) {
+      return String(name || '')
+        .replace(/\s*Community Development Council$/i, '')
+        .trim();
+    }
+
+    function getTranslatedName(rawName) {
+      const key = findDictKey(rawName);
+      if (key && sgMapDict[key] && currentLang === 'zh') return sgMapDict[key].zh;
+      return stripSuffix(rawName);
+    }
+
+    function findDictKey(name) {
+      const raw = String(name || '').trim();
+      if (sgMapDict[raw]) return raw;
+      const s = stripSuffix(raw);
+      for (let k in sgMapDict) {
+        if (k === raw || stripSuffix(k) === s) return k;
+        if (sgMapDict[k].zh === raw) return k;
+      }
+      return null;
+    }
+
+    // 把 done.json 的名字统一成底图主键
+    function cleanSgName(name) {
+      if (!name) return '';
+      const raw = String(name || '').trim();
+
+      const direct = findDictKey(raw);
+      if (direct) return direct;
+      if (sgAlias[raw]) return sgAlias[raw];
+
+      for (let k in sgMapDict) {
+        if (sgMapDict[k].zh === raw || raw.indexOf(sgMapDict[k].zh) === 0) return k;
+      }
+      return stripSuffix(raw);
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      if (currentLang === 'zh') return parts[0].trim();
+      return (parts[1] || parts[0]).trim();
+    }
+
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+
+      // 标题：写了具体地点就显示地点（如 樟宜），否则显示区域名
+      const isCountryLevel = COUNTRY_LEVEL.indexOf(rawProvince) >= 0;
+      const key = isCountryLevel ? null : cleanSgName(rawProvince);
+      const titleName = key ? getTranslatedName(key) : (currentLang === 'zh' ? '新加坡' : 'Singapore');
+
+      let html = `<div class="tip-title">${titleName}</div>`;
+      if (key && titleName !== rawProvince) html += `<div class="tip-sub">(${rawProvince})</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        return `<span style="color:var(--text-dim); font-weight:bold;">${link}</span>`;
+      }
+
+      if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
+      if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
+      if (displayRemark) html += `<div class="tip-remark">${t.remark}${displayRemark}</div>`;
+      
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+    let allParsedData = [];
+    const provinceDataMap = {};
+
+    // ==================== done.json 解析 ====================
+    // ★ 关键：必须按「行」解析。
+    //   done.json 里很多备注带英文逗号，例如
+    //     "...;属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG"
+    //   如果用 split(',') 切，这一条会被切成 "…the East China plugin" 和 "both for AF4 and AFG" 两条，
+    //   而两边都没有引号包裹，正则再去引号时就会把相邻两行粘在一起 —— 于是新加坡页会混进中国的地景数据。
+    function parseDoneJson(rawText) {
+      const result = [];
+      if (!rawText) return result;
+
+      let body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+
+      const lines = body.split(/\r?\n/);
+      lines.forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        // 去掉 JSON 数组里的行尾逗号 + 首尾引号（逐行处理，天然不会被正文里的逗号切坏）
+        l = l.replace(/,\s*$/, '').trim();
+        l = l.replace(/^"/, '').replace(/"$/, '').trim();
+        if (!l) return;
+
+        l = l.replace(/；/g, ';');   // 兼容中文分号
+
+        const parts = l.split(';');
+        const rawProvince = (parts[0] || '').trim();
+        if (!rawProvince) return;
+
+        // 备注里可能有分号，全部并入备注
+        const remark = parts.length > 6 ? parts.slice(6).join(';') : (parts[6] || '');
+
+        result.push({
+          rawProvince: rawProvince,
+          author: parts[1] || i18n[currentLang].unknown,
+          freeLink: parts[2] || '', freeLevel: parts[3] || '',
+          paidLink: parts[4] || '', paidLevel: parts[5] || '',
+          remark: remark
+        });
+      });
+
+      return result;
+    }
+
+    async function fetchData() {
+      allParsedData = [];
+      try {
+        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        if (doneRes.ok) {
+          allParsedData = parseDoneJson(await doneRes.text());
+        }
+      } catch (e) { console.error("读取 done.json 失败", e); }
+    }
+
+    const SINGAPORE_GEOJSON_URLS = [
+      '../GeoJSON/Singapore.json'
+    ];
+
+    async function loadSingaporeGeoJson() {
+      for (const url of SINGAPORE_GEOJSON_URLS) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) return await res.json();
+        } catch (e) { console.warn('新加坡地图数据读取失败：', url); }
+      }
+      throw new Error('新加坡地图数据加载失败，请检查 GeoJSON/Singapore.json。');
+    }
+
+    async function renderMap() {
+      myChart.showLoading();
+      try {
+        const realGeoJson = await loadSingaporeGeoJson();
+        echarts.registerMap('singapore', realGeoJson);
+
+        const features = realGeoJson.features.map(f => f.properties.name);
+        const mapData = [];
+
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
+        // ★ 严格过滤：只有「真正属于新加坡」的条目才参与匹配
+        //   别的国家的数据（中国、日本…）虽然也读进来了，但这里必须全部丢掉，
+        //   否则会错误归属到新加坡某个区，hover 时冒出来一堆中国地景。
+        // 判定顺序：
+        //   1) 名字就是 新加坡/Singapore → 整国条目
+        //   2) 名字能精确命中某个区域（中区 / Central / 樟宜 …）
+        //   3) 其余一律忽略
+        const countryLevelItems = allParsedData.filter(item => {
+          const raw = String(item.rawProvince || '').trim();
+          return COUNTRY_LEVEL.indexOf(raw) >= 0;
+        });
+
+        const isKnownArea = (name) => {
+          if (!name) return null;
+          if (features.indexOf(name) >= 0) return name;
+          if (sgAlias[name] && features.indexOf(sgAlias[name]) >= 0) return sgAlias[name];
+          const zh = Object.keys(sgMapDict).find(k => sgMapDict[k].zh === name);
+          if (zh && features.indexOf(zh) >= 0) return zh;
+          return null;
+        };
+
+        const itemTarget = {};
+        allParsedData.forEach(item => {
+          const raw = String(item.rawProvince || '').trim();
+          if (COUNTRY_LEVEL.indexOf(raw) >= 0) return;   // 整国条目后面单独处理
+
+          const target = isKnownArea(raw);
+          if (!target) {
+            // 不属于新加坡的地点：直接跳过（不再兜底到中区）
+            return;
+          }
+          (itemTarget[target] = itemTarget[target] || []).push(item);
+        });
+
+        const countryHtml = countryLevelItems
+          .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
+          .join('<hr class="tip-hr" />');
+
+        features.forEach(featureName => {
+          const localItems = itemTarget[featureName];
+          const isCountry = countryLevelItems.length > 0;
+
+          if (localItems || isCountry) {
+            mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+
+            const parts = [];
+            if (localItems) parts.push(localItems
+              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
+              .join('<hr class="tip-hr" />'));
+            if (countryHtml) parts.push(countryHtml);
+
+            provinceDataMap[featureName] = parts.join('<hr class="tip-hr" />');
+          }
+        });
+
+        myChart.hideLoading();
+        document.getElementById('loading-tip').style.display = 'none';
+
+        // 重新挂载时先收掉旧浮层（切换语言会重新渲染，避免残留）
+        hideTooltip();
+
+                const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+
+
+myChart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: 'singapore',
+            roam: true,
+            zoom: 1.1,
+            label: Object.assign({}, style.label, {
+              formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+            }),
+            itemStyle: style.itemStyle,
+            selectedMode: false,
+            emphasis: style.emphasis,
+            data: mapData
+          }]
+        }, true);
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        const tipEl = document.getElementById('loading-tip');
+                tipEl.classList.add('is-error');
+        tipEl.style.display = 'inline-flex';
+        tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/Singapore.json 是否存在。';
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      document.getElementById('back-btn').innerText = i18n[currentLang].back;
+    }
+
+    async function initApp() { updateUI(); await fetchData(); renderMap(); }
+    // 深浅主题切换后重绘地图（配色取自主题变量）
+    if (window.HSLTheme && HSLTheme.onChange) {
+      HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+    }
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI(); await fetchData(); renderMap();
+    });
+
+    // ==================== 悬浮提示 ====================
+    // 新版把 5 个区域全部点亮并共用同一份内容，所以用「共用容器」的方式：
+    // 在每次渲染时重建一个 tooltip 节点，避免旧监听器/旧定时器残留，
+    // 防止出现浮层堆叠、内容串台、关不掉的情况。
+    let tooltipEl = document.getElementById('my-tooltip');
+    let isOverBox = false;
+    let hideTimer = null;
+    let currentHoverName = null;
+
+    function rebuildTooltip() {
+      // 移除旧节点（连同它身上的监听器）
+      if (tooltipEl && tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl);
+
+      const el = document.createElement('div');
+      el.id = 'my-tooltip';
+      // 外观全部交给 assets/scenery.css 的 #my-tooltip，这里只保留行为相关属性
+      el.style.pointerEvents = 'auto';
+      el.style.zIndex = '99999';
+      el.style.display = 'none';
+      document.body.appendChild(el);
+      tooltipEl = el;
+
+      isOverBox = false;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      currentHoverName = null;
+
+      // 鼠标进入浮层时保持显示
+      el.addEventListener('mouseenter', () => { isOverBox = true; if (hideTimer) clearTimeout(hideTimer); });
+      el.addEventListener('mouseleave', () => {
+        isOverBox = false;
+        el.style.display = 'none';
+        currentHoverName = null;
+      });
+    }
+
+    function hideTooltip() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      isOverBox = false;
+      currentHoverName = null;
+      if (tooltipEl) tooltipEl.style.display = 'none';
+    }
+
+    function showTooltipAt(contentHtml, event) {
+      if (!tooltipEl) return;
+      tooltipEl.innerHTML = contentHtml;
+      tooltipEl.style.transform = 'none';
+      tooltipEl.style.bottom = 'auto';
+      tooltipEl.style.display = 'block';
+
+      // 每次先归位，保证尺寸测量准确
+      tooltipEl.style.left = '0px';
+      tooltipEl.style.top = '0px';
+
+      if (event) {
+        let x = event.clientX + 20;
+        let y = event.clientY - 20;
+        const w = tooltipEl.offsetWidth;
+        const h = tooltipEl.offsetHeight;
+
+        if (x + w > window.innerWidth) x = Math.max(10, event.clientX - w - 20);
+        if (y + h > window.innerHeight) y = Math.max(10, window.innerHeight - h - 10);
+        if (y < 10) y = 10;
+
+        tooltipEl.style.left = x + 'px';
+        tooltipEl.style.top = y + 'px';
+      }
+    }
+
+    if (!isMobile) {
+      // 鼠标移入区域
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name]) return;
+        if (isOverBox) return;                       // 指针在浮层上，不要刷新
+        if (currentHoverName === params.name && tooltipEl.style.display === 'block') return;
+
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        showTooltipAt(provinceDataMap[params.name], params.event && params.event.event);
+      });
+
+      // 鼠标离开区域：延迟隐藏，给用户移到浮层上的时间
+      myChart.on('mouseout', function () {
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => {
+          if (!isOverBox) hideTooltip();
+        }, 300);
+      });
+
+      // 指针离开整个画布：立刻收起
+      const mapEl = document.getElementById('map');
+      mapEl.addEventListener('mouseleave', function () {
+        if (!isOverBox) hideTooltip();
+      });
+
+      // 任何滚动缩放，浮层位置都失效了，直接收起
+      myChart.on('georoam', hideTooltip);
+      window.addEventListener('scroll', hideTooltip, true);
+    }
+
+    // 手机端：点击显示/收起
+    myChart.on('click', function (params) {
+      if (!isMobile || !provinceDataMap[params.name]) return;
+      if (tooltipEl.style.display === 'block' && currentHoverName === params.name) {
+        hideTooltip();
+        return;
+      }
+      currentHoverName = params.name;
+      tooltipEl.innerHTML = provinceDataMap[params.name];
+      tooltipEl.style.left = '50%';
+      tooltipEl.style.top = 'auto';
+      tooltipEl.style.bottom = '50px';
+      tooltipEl.style.transform = 'translateX(-50%)';
+      tooltipEl.style.maxWidth = '90vw';
+      tooltipEl.style.whiteSpace = 'normal';
+      tooltipEl.style.display = 'block';
+    });
+
+    // 点空白处收起
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) hideTooltip();
+    });
+
+    window.addEventListener('resize', () => { myChart.resize(); hideTooltip(); });
+  </script>
+</body>
+</html>

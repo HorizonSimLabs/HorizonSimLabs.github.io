@@ -1,0 +1,150 @@
+/* ==========================================================================
+   HorizonSimLabs — 资源列表页通用样式（涂装 / 功能 / 音效）
+   依赖 assets/theme.css 的令牌；通过 --catalog-accent 变量切换主题色
+   ========================================================================== */
+
+/* ---------- 顶部标题区 ---------- */
+.cat-header {
+  position: relative; z-index: 3;
+  padding: 24px clamp(16px, 4vw, 48px) 0;
+}
+.cat-header-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  padding-bottom: 22px; border-bottom: 1px solid var(--line);
+}
+.cat-headings { flex: 1; min-width: 200px; }
+.cat-eyebrow {
+  font-size: .72rem; font-weight: 800; letter-spacing: .24em; text-transform: uppercase;
+  color: var(--text-mute); margin-bottom: 6px;
+}
+.cat-title {
+  margin: 0; font-size: clamp(1.5rem, 3.4vw, 2.2rem); font-weight: 900; letter-spacing: -.01em;
+  background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.cat-sub { margin: 7px 0 0; font-size: .87rem; color: var(--text-dim); }
+.cat-sub b { color: var(--catalog-accent, var(--brand)); }
+.cat-brand { margin-left: auto; }
+.cat-brand .hsl-brand-name { font-size: .82rem; }
+.cat-brand img { width: 38px; height: 38px; }
+
+/* ---------- 主体 ---------- */
+.cat-main {
+  max-width: 1280px; margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 48px) 60px;
+}
+
+/* ---------- 工具栏 ---------- */
+.cat-toolbar {
+  display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+  padding: 16px 20px; margin-bottom: 26px; border-radius: var(--r-md);
+}
+.cat-search { flex: 1 1 240px; min-width: 200px; }
+.cat-filters { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+
+.filter-group { display: flex; flex-direction: column; gap: 7px; min-width: 150px; }
+.filter-group > label {
+  font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-mute); padding-left: 4px;
+}
+.filter-group select {
+  appearance: none; -webkit-appearance: none;
+  padding: 10px 34px 10px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel-sunken); color: var(--text);
+  font-size: .88rem; font-family: inherit; cursor: pointer; outline: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: calc(100% - 17px) 50%, calc(100% - 12px) 50%;
+  background-size: 5px 5px, 5px 5px; background-repeat: no-repeat;
+  transition: border-color .25s ease, box-shadow .25s ease, background-color .25s ease;
+}
+.filter-group select:hover { border-color: var(--line-strong); }
+.filter-group select:focus {
+  border-color: var(--catalog-accent, var(--brand));
+  box-shadow: 0 0 0 4px rgba(77, 141, 255, .16);
+}
+.cat-reset { padding: 10px 18px; }
+
+/* ---------- 卡片网格 ---------- */
+.cat-grid {
+  display: grid; gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+
+.cat-card {
+  display: flex; flex-direction: column;
+  animation: hsl-rise .55s var(--ease) both;
+}
+
+/* 图片区 */
+.cat-thumb {
+  position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+  background: linear-gradient(140deg, var(--panel-sunken), var(--panel));
+}
+.cat-thumb img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform .6s var(--ease), filter .4s ease;
+}
+.cat-card:hover .cat-thumb img { transform: scale(1.07); }
+.cat-thumb::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, .45) 100%);
+}
+:root[data-theme="light"] .cat-thumb::after {
+  background: linear-gradient(180deg, transparent 60%, rgba(15, 30, 51, .28) 100%);
+}
+
+.cat-badge {
+  position: absolute; z-index: 2; left: 12px; bottom: 12px;
+  padding: 5px 12px; border-radius: 999px;
+  font-size: .72rem; font-weight: 800; letter-spacing: .04em; color: #fff;
+  background: rgba(10, 17, 32, .62); border: 1px solid rgba(255, 255, 255, .22);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+
+/* 内容区 */
+.cat-body { display: flex; flex-direction: column; gap: 13px; padding: 18px 18px 18px; flex: 1; }
+.cat-name {
+  margin: 0; font-size: 1.02rem; font-weight: 800; line-height: 1.45;
+  color: var(--text); word-break: break-word;
+}
+
+.cat-meta { display: flex; flex-direction: column; gap: 8px; }
+.meta-row { display: flex; align-items: baseline; gap: 10px; font-size: .85rem; }
+.meta-k {
+  flex: 0 0 auto; min-width: 34px; color: var(--text-mute);
+  font-size: .74rem; font-weight: 700; letter-spacing: .06em;
+}
+.meta-v { color: var(--text-dim); font-weight: 600; word-break: break-word; }
+
+.cat-dl { width: 100%; margin-top: auto; padding: 11px 18px; border-radius: 12px; }
+
+/* 功能页：两个按钮并排 */
+.cat-actions { display: flex; gap: 10px; margin-top: auto; }
+.cat-actions .hsl-btn { flex: 1; padding: 11px 14px; border-radius: 12px; }
+.cat-actions .hsl-btn--outline {
+  background: transparent; border-color: var(--line-strong);
+  color: var(--catalog-accent, var(--brand));
+}
+.cat-actions .hsl-btn--outline:hover {
+  background: var(--catalog-accent, var(--brand)); color: #fff; border-color: transparent;
+}
+
+/* ---------- 页脚 ---------- */
+.cat-foot {
+  padding: 26px 20px 30px; text-align: center;
+  font-size: .78rem; color: var(--text-mute);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 720px) {
+  .cat-header-inner { gap: 12px; }
+  .cat-brand { display: none; }
+  .cat-toolbar { padding: 14px; gap: 12px; }
+  .cat-filters { width: 100%; }
+  .filter-group { flex: 1 1 140px; min-width: 0; }
+  .cat-reset { width: 100%; }
+  .cat-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+  .cat-body { padding: 14px; gap: 10px; }
+  .cat-name { font-size: .94rem; }
+}

@@ -1,0 +1,287 @@
+﻿=== 改UI前有、现在没有 (150) ===
+240|     const SINGAPORE_GEOJSON_URLS = [
+241|       '../GeoJSON/Singapore.json'
+242|     ];
+244|     async function loadSingaporeGeoJson() {
+245|       for (const url of SINGAPORE_GEOJSON_URLS) {
+246|         try {
+247|           const res = await fetch(url);
+248|           if (res.ok) return await res.json();
+249|         } catch (e) { console.warn('新加坡地图数据读取失败：', url); }
+250|       }
+251|       throw new Error('新加坡地图数据加载失败，请检查 GeoJSON/Singapore.json。');
+252|     }
+253| 
+257|         const realGeoJson = await loadSingaporeGeoJson();
+308|             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+326|                 const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+327| 
+329| myChart.setOption({
+330|           backgroundColor: 'transparent',
+345|         }, true);
+347|       } catch (e) {
+348|         console.error("地图加载失败", e);
+349|         myChart.hideLoading();
+350|         const tipEl = document.getElementById('loading-tip');
+352|         tipEl.style.display = 'inline-flex';
+353|         tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/Singapore.json 是否存在。';
+354|       }
+355|     }
+357|     function updateUI() {
+358|       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+359|       document.getElementById('back-btn').innerText = i18n[currentLang].back;
+360|     }
+362|     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+363|     // 深浅主题切换后重绘地图（配色取自主题变量）
+364|     if (window.HSLTheme && HSLTheme.onChange) {
+365|       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+366|     }
+367|     initApp();
+369|     document.getElementById('lang-btn').addEventListener('click', async () => {
+370|       currentLang = currentLang === 'zh' ? 'en' : 'zh';
+371|       updateUI(); await fetchData(); renderMap();
+372|     });
+374|     // ==================== 悬浮提示 ====================
+375|     // 新版把 5 个区域全部点亮并共用同一份内容，所以用「共用容器」的方式：
+376|     // 在每次渲染时重建一个 tooltip 节点，避免旧监听器/旧定时器残留，
+377|     // 防止出现浮层堆叠、内容串台、关不掉的情况。
+378|     let tooltipEl = document.getElementById('my-tooltip');
+379|     let isOverBox = false;
+380|     let hideTimer = null;
+381|     let currentHoverName = null;
+383|     function rebuildTooltip() {
+384|       // 移除旧节点（连同它身上的监听器）
+385|       if (tooltipEl && tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl);
+387|       const el = document.createElement('div');
+388|       el.id = 'my-tooltip';
+389|       // 外观全部交给 assets/scenery.css 的 #my-tooltip，这里只保留行为相关属性
+390|       el.style.pointerEvents = 'auto';
+391|       el.style.zIndex = '99999';
+392|       el.style.display = 'none';
+393|       document.body.appendChild(el);
+394|       tooltipEl = el;
+396|       isOverBox = false;
+397|       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+398|       currentHoverName = null;
+400|       // 鼠标进入浮层时保持显示
+401|       el.addEventListener('mouseenter', () => { isOverBox = true; if (hideTimer) clearTimeout(hideTimer); });
+402|       el.addEventListener('mouseleave', () => {
+403|         isOverBox = false;
+404|         el.style.display = 'none';
+405|         currentHoverName = null;
+406|       });
+407|     }
+409|     function hideTooltip() {
+410|       if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+411|       isOverBox = false;
+412|       currentHoverName = null;
+413|       if (tooltipEl) tooltipEl.style.display = 'none';
+414|     }
+416|     function showTooltipAt(contentHtml, event) {
+417|       if (!tooltipEl) return;
+418|       tooltipEl.innerHTML = contentHtml;
+419|       tooltipEl.style.transform = 'none';
+420|       tooltipEl.style.bottom = 'auto';
+421|       tooltipEl.style.display = 'block';
+423|       // 每次先归位，保证尺寸测量准确
+424|       tooltipEl.style.left = '0px';
+425|       tooltipEl.style.top = '0px';
+427|       if (event) {
+428|         let x = event.clientX + 20;
+429|         let y = event.clientY - 20;
+430|         const w = tooltipEl.offsetWidth;
+431|         const h = tooltipEl.offsetHeight;
+433|         if (x + w > window.innerWidth) x = Math.max(10, event.clientX - w - 20);
+434|         if (y + h > window.innerHeight) y = Math.max(10, window.innerHeight - h - 10);
+435|         if (y < 10) y = 10;
+437|         tooltipEl.style.left = x + 'px';
+438|         tooltipEl.style.top = y + 'px';
+439|       }
+440|     }
+442|     if (!isMobile) {
+443|       // 鼠标移入区域
+444|       myChart.on('mouseover', function (params) {
+445|         if (!provinceDataMap[params.name]) return;
+446|         if (isOverBox) return;                       // 指针在浮层上，不要刷新
+447|         if (currentHoverName === params.name && tooltipEl.style.display === 'block') return;
+449|         if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+450|         currentHoverName = params.name;
+451|         tooltipEl.innerHTML = provinceDataMap[params.name];
+452|         showTooltipAt(provinceDataMap[params.name], params.event && params.event.event);
+453|       });
+455|       // 鼠标离开区域：延迟隐藏，给用户移到浮层上的时间
+456|       myChart.on('mouseout', function () {
+457|         if (hideTimer) clearTimeout(hideTimer);
+458|         hideTimer = setTimeout(() => {
+460|         }, 300);
+461|       });
+463|       // 指针离开整个画布：立刻收起
+464|       const mapEl = document.getElementById('map');
+465|       mapEl.addEventListener('mouseleave', function () {
+466|         if (!isOverBox) hideTooltip();
+467|       });
+469|       // 任何滚动缩放，浮层位置都失效了，直接收起
+470|       myChart.on('georoam', hideTooltip);
+471|       window.addEventListener('scroll', hideTooltip, true);
+472|     }
+474|     // 手机端：点击显示/收起
+475|     myChart.on('click', function (params) {
+476|       if (!isMobile || !provinceDataMap[params.name]) return;
+477|       if (tooltipEl.style.display === 'block' && currentHoverName === params.name) {
+478|         hideTooltip();
+479|         return;
+480|       }
+481|       currentHoverName = params.name;
+482|       tooltipEl.innerHTML = provinceDataMap[params.name];
+483|       tooltipEl.style.left = '50%';
+484|       tooltipEl.style.top = 'auto';
+485|       tooltipEl.style.bottom = '50px';
+486|       tooltipEl.style.transform = 'translateX(-50%)';
+487|       tooltipEl.style.maxWidth = '90vw';
+488|       tooltipEl.style.whiteSpace = 'normal';
+489|       tooltipEl.style.display = 'block';
+490|     });
+492|     // 点空白处收起
+493|     myChart.getZr().on('click', function (event) {
+494|       if (isMobile && !event.target) hideTooltip();
+495|     });
+497|     window.addEventListener('resize', () => { myChart.resize(); hideTooltip(); });
+498|   </script>
+499| </body>
+500| </html>
+=== 现在有、改UI前没有 (135) ===
+244|         const realGeoJson = await (async () => {
+245|           const res = await fetch(`../GeoJSON/Singapore.json`);
+246|           if (!res.ok) throw new Error('HTTP ' + res.status);
+247|           return await res.json();
+248|         })();
+299|             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+317|         const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+319|         myChart.setOption({
+334|           });
+336|           } catch (e) {
+337|           console.error("地图加载失败", e);
+338|           myChart.hideLoading();
+339|           const tipEl = document.getElementById('loading-tip');
+341|           tipEl.style.display = 'inline-flex';
+342|           tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+343|           }
+344|           }
+346|           function updateUI() {
+347|           document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+348|           document.getElementById('back-btn').innerText = i18n[currentLang].back;
+349|           }
+351|           async function initApp() { updateUI(); await fetchData(); renderMap(); }
+352|           initApp();
+354|           document.getElementById('lang-btn').addEventListener('click', async () => {
+355|           currentLang = currentLang === 'zh' ? 'en' : 'zh';
+356|           updateUI(); await fetchData(); renderMap();
+357|           });
+359|           // ==================== 悬浮提示 ====================
+360|           // 新版把 5 个区域全部点亮并共用同一份内容，所以用「共用容器」的方式：
+361|           // 在每次渲染时重建一个 tooltip 节点，避免旧监听器/旧定时器残留，
+362|           // 防止出现浮层堆叠、内容串台、关不掉的情况。
+363|           let tooltipEl = document.getElementById('my-tooltip');
+364|           let isOverBox = false;
+365|           let hideTimer = null;
+366|           let currentHoverName = null;
+368|           function rebuildTooltip() {
+369|           // 移除旧节点（连同它身上的监听器）
+370|           if (tooltipEl && tooltipEl.parentNode) tooltipEl.parentNode.removeChild(tooltipEl);
+372|           const el = document.createElement('div');
+373|           el.id = 'my-tooltip';
+374|           // 外观全部交给 assets/scenery.css 的 #my-tooltip，这里只保留行为相关属性
+375|           el.style.pointerEvents = 'auto';
+376|           el.style.zIndex = '99999';
+377|           el.style.display = 'none';
+378|           document.body.appendChild(el);
+379|           tooltipEl = el;
+381|           isOverBox = false;
+382|           if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+383|           currentHoverName = null;
+385|           // 鼠标进入浮层时保持显示
+386|           el.addEventListener('mouseenter', () => { isOverBox = true; if (hideTimer) clearTimeout(hideTimer); });
+387|           el.addEventListener('mouseleave', () => {
+388|           isOverBox = false;
+389|           el.style.display = 'none';
+390|           currentHoverName = null;
+391|           });
+392|           }
+394|           function hideTooltip() {
+395|           if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+396|           isOverBox = false;
+397|           currentHoverName = null;
+398|           if (tooltipEl) tooltipEl.style.display = 'none';
+399|           }
+401|           function showTooltipAt(contentHtml, event) {
+402|           if (!tooltipEl) return;
+403|           tooltipEl.innerHTML = contentHtml;
+404|           tooltipEl.style.transform = 'none';
+405|           tooltipEl.style.bottom = 'auto';
+406|           tooltipEl.style.display = 'block';
+408|           // 每次先归位，保证尺寸测量准确
+409|           tooltipEl.style.left = '0px';
+410|           tooltipEl.style.top = '0px';
+412|           if (event) {
+413|           let x = event.clientX + 20;
+414|           let y = event.clientY - 20;
+415|           const w = tooltipEl.offsetWidth;
+416|           const h = tooltipEl.offsetHeight;
+418|           if (x + w > window.innerWidth) x = Math.max(10, event.clientX - w - 20);
+419|           if (y + h > window.innerHeight) y = Math.max(10, window.innerHeight - h - 10);
+420|           if (y < 10) y = 10;
+422|           tooltipEl.style.left = x + 'px';
+423|           tooltipEl.style.top = y + 'px';
+424|           }
+425|           }
+427|           if (!isMobile) {
+428|           // 鼠标移入区域
+429|           myChart.on('mouseover', function (params) {
+430|           if (!provinceDataMap[params.name]) return;
+431|           if (isOverBox) return;                       // 指针在浮层上，不要刷新
+432|           if (currentHoverName === params.name && tooltipEl.style.display === 'block') return;
+434|           if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+435|           currentHoverName = params.name;
+436|           tooltipEl.innerHTML = provinceDataMap[params.name];
+437|           showTooltipAt(provinceDataMap[params.name], params.event && params.event.event);
+438|           });
+440|           // 鼠标离开区域：延迟隐藏，给用户移到浮层上的时间
+441|           myChart.on('mouseout', function () {
+442|           if (hideTimer) clearTimeout(hideTimer);
+443|           hideTimer = setTimeout(() => {
+445|           }, 300);
+446|           });
+448|           // 指针离开整个画布：立刻收起
+449|           const mapEl = document.getElementById('map');
+450|           mapEl.addEventListener('mouseleave', function () {
+451|           if (!isOverBox) hideTooltip();
+452|           });
+454|           // 任何滚动缩放，浮层位置都失效了，直接收起
+455|           myChart.on('georoam', hideTooltip);
+456|           window.addEventListener('scroll', hideTooltip, true);
+457|           }
+459|           // 手机端：点击显示/收起
+460|           myChart.on('click', function (params) {
+461|           if (!isMobile || !provinceDataMap[params.name]) return;
+462|           if (tooltipEl.style.display === 'block' && currentHoverName === params.name) {
+463|           hideTooltip();
+464|           return;
+465|           }
+466|           currentHoverName = params.name;
+467|           tooltipEl.innerHTML = provinceDataMap[params.name];
+468|           tooltipEl.style.left = '50%';
+469|           tooltipEl.style.top = 'auto';
+470|           tooltipEl.style.bottom = '50px';
+471|           tooltipEl.style.transform = 'translateX(-50%)';
+472|           tooltipEl.style.maxWidth = '90vw';
+473|           tooltipEl.style.whiteSpace = 'normal';
+474|           tooltipEl.style.display = 'block';
+475|           });
+477|           // 点空白处收起
+478|           myChart.getZr().on('click', function (event) {
+479|           if (isMobile && !event.target) hideTooltip();
+480|           });
+482|           window.addEventListener('resize', () => { myChart.resize(); hideTooltip(); });
+483|           </script>
+484|           </body>
+485|           </html>

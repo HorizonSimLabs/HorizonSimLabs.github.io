@@ -1,0 +1,132 @@
+﻿=== 改UI前有、现在没有 (73) ===
+225|     // 朝鲜的一级行政区划（道 / 直辖市 / 特别区）
+226|     const KOREA_GEOJSON_URLS = [
+227|       '../GeoJSON/North_Korea.json',
+228|     ];
+230|     async function loadKoreaGeoJson() {
+231|       for (const url of KOREA_GEOJSON_URLS) {
+232|         try {
+233|           const res = await fetch(url);
+234|           if (res.ok) return await res.json();
+235|         } catch (e) { console.warn('朝鲜分区数据读取失败，尝试下一个源：', url); }
+236|       }
+237|       throw new Error('朝鲜分区地图数据加载失败，请检查 GeoJSON/North_Korea.json。');
+238|     }
+239| 
+243|         const realGeoJson = await loadKoreaGeoJson();
+257|             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+267|                 const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+268| 
+270| myChart.setOption({
+271|           backgroundColor: 'transparent',
+286|         }, true);
+288|       } catch (e) {
+289|         console.error("地图加载失败", e);
+290|         myChart.hideLoading();
+291|         const tipEl = document.getElementById('loading-tip');
+293|         tipEl.style.display = 'inline-flex';
+294|         tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/North_Korea.json 是否存在。';
+295|       }
+296|     }
+298|     function updateUI() {
+299|       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+300|       document.getElementById('back-btn').innerText = i18n[currentLang].back;
+301|     }
+303|     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+304|     // 深浅主题切换后重绘地图（配色取自主题变量）
+305|     if (window.HSLTheme && HSLTheme.onChange) {
+306|       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+307|     }
+308|     initApp();
+310|     document.getElementById('lang-btn').addEventListener('click', async () => {
+311|       currentLang = currentLang === 'zh' ? 'en' : 'zh';
+312|       updateUI(); await fetchData(); renderMap();
+313|     });
+315|     if (!isMobile) {
+316|       let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+317|       myChart.on('mouseover', function (params) {
+318|         if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+319|         clearTimeout(hideTimer); currentHoverName = params.name;
+320|         tooltipEl.innerHTML = provinceDataMap[params.name];
+321|         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+322|         if (params.event && params.event.event) {
+329|         }
+330|       });
+331|       myChart.on('mouseout', function () {
+332|         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+333|       });
+334|       tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+335|       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+336|     }
+338|     myChart.on('click', function(params) {
+339|       if (isMobile && provinceDataMap[params.name]) {
+340|         tooltipEl.innerHTML = provinceDataMap[params.name];
+341|         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+342|         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+343|       }
+344|     });
+346|     myChart.getZr().on('click', function (event) {
+347|       if (isMobile && !event.target) tooltipEl.style.display = 'none';
+348|     });
+350|     window.addEventListener('resize', () => myChart.resize());
+351|   </script>
+352| </body>
+353| </html>
+=== 现在有、改UI前没有 (57) ===
+229|         const realGeoJson = await (async () => {
+230|           const res = await fetch(`../GeoJSON/North_Korea.json`);
+231|           if (!res.ok) throw new Error('HTTP ' + res.status);
+232|           return await res.json();
+233|         })();
+247|             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+257|         const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+259|         myChart.setOption({
+274|           });
+276|           } catch (e) {
+277|           console.error("地图加载失败", e);
+278|           myChart.hideLoading();
+279|           const tipEl = document.getElementById('loading-tip');
+281|           tipEl.style.display = 'inline-flex';
+282|           tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+283|           }
+284|           }
+286|           function updateUI() {
+287|           document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+288|           document.getElementById('back-btn').innerText = i18n[currentLang].back;
+289|           }
+291|           async function initApp() { updateUI(); await fetchData(); renderMap(); }
+292|           initApp();
+294|           document.getElementById('lang-btn').addEventListener('click', async () => {
+295|           currentLang = currentLang === 'zh' ? 'en' : 'zh';
+296|           updateUI(); await fetchData(); renderMap();
+297|           });
+299|           if (!isMobile) {
+300|           let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+301|           myChart.on('mouseover', function (params) {
+302|           if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+303|           clearTimeout(hideTimer); currentHoverName = params.name;
+304|           tooltipEl.innerHTML = provinceDataMap[params.name];
+305|           tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+306|           if (params.event && params.event.event) {
+313|           }
+314|           });
+315|           myChart.on('mouseout', function () {
+316|           hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+317|           });
+318|           tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+319|           tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+320|           }
+322|           myChart.on('click', function(params) {
+323|           if (isMobile && provinceDataMap[params.name]) {
+324|           tooltipEl.innerHTML = provinceDataMap[params.name];
+325|           tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+326|           tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+327|           }
+328|           });
+330|           myChart.getZr().on('click', function (event) {
+331|           if (isMobile && !event.target) tooltipEl.style.display = 'none';
+332|           });
+334|           window.addEventListener('resize', () => myChart.resize());
+335|           </script>
+336|           </body>
+337|           </html>

@@ -1,0 +1,184 @@
+﻿=== 改UI前有、现在没有 (99) ===
+281|     //   所以优先读取 GeoJSON/South_Korea.json，本地没有再回退到在线分区数据源。
+282|     const KOREA_GEOJSON_URLS = [
+283|       '../GeoJSON/South_Korea.json',
+284|     ];
+286|     async function loadKoreaGeoJson() {
+287|       for (const url of KOREA_GEOJSON_URLS) {
+288|         try {
+289|           const res = await fetch(url);
+290|           if (res.ok) return await res.json();
+291|         } catch (e) { console.warn('韩国分区数据读取失败，尝试下一个源：', url); }
+292|       }
+293|       throw new Error('韩国分区地图数据加载失败，请检查 GeoJSON/South_Korea.json。');
+294|     }
+295| 
+302|         const realKrGeoJson = await loadKoreaGeoJson();
+319|             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+328|                 const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+329| 
+331| myChart.setOption({
+332|           backgroundColor: 'transparent',
+350|         }, true);
+352|       } catch (e) {
+353|         console.error("地图加载失败", e);
+354|         myChart.hideLoading();
+355|         const tipEl = document.getElementById('loading-tip');
+356|         if (tipEl) {
+358|           tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/South_Korea.json 是否存在。';
+360|         }
+361|       }
+362|     }
+364|     function updateUI() {
+365|       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+366|       document.getElementById('back-btn').innerText = i18n[currentLang].back;
+367|     }
+369|     async function initApp() {
+370|       updateUI();
+371|       await fetchData();
+372|       await renderMap();
+373|     }
+374|     // 深浅主题切换后重绘地图（配色取自主题变量）
+375|     if (window.HSLTheme && HSLTheme.onChange) {
+376|       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+377|     }
+379|     initApp();
+381|     document.getElementById('lang-btn').addEventListener('click', async () => {
+382|       currentLang = currentLang === 'zh' ? 'en' : 'zh';
+383|       updateUI();
+384|       await fetchData();
+385|       await renderMap();
+386|     });
+388|     if (!isMobile) {
+389|       let isOverBox = false;
+390|       let hideTimer = null;
+391|       let currentHoverName = null;
+393|       myChart.on('mouseover', function (params) {
+394|         if (!provinceDataMap[params.name]) return;
+395|         if (isOverBox || currentHoverName === params.name) return;
+397|         clearTimeout(hideTimer);
+398|         currentHoverName = params.name;
+399|         tooltipEl.innerHTML = provinceDataMap[params.name];
+400|         tooltipEl.style.transform = 'none';
+401|         tooltipEl.style.bottom = 'auto';
+402|         tooltipEl.style.display = 'block';
+404|         if (params.event && params.event.event) {
+415|         }
+416|       });
+418|       myChart.on('mouseout', function () {
+419|         hideTimer = setTimeout(() => {
+424|         }, 300);
+425|       });
+427|       tooltipEl.addEventListener('mouseenter', () => {
+428|         isOverBox = true;
+429|         clearTimeout(hideTimer);
+430|       });
+432|       tooltipEl.addEventListener('mouseleave', () => {
+433|         isOverBox = false;
+434|         tooltipEl.style.display = 'none';
+435|         currentHoverName = null;
+436|       });
+437|     }
+439|     myChart.on('click', function(params) {
+440|       if (isMobile && provinceDataMap[params.name]) {
+441|         tooltipEl.innerHTML = provinceDataMap[params.name];
+442|         tooltipEl.style.display = 'block';
+443|         tooltipEl.style.left = '50%';
+444|         tooltipEl.style.top = 'auto';
+445|         tooltipEl.style.bottom = '50px';
+446|         tooltipEl.style.transform = 'translateX(-50%)';
+447|       }
+448|     });
+450|     myChart.getZr().on('click', function (event) {
+451|       if (isMobile && !event.target) {
+452|         tooltipEl.style.display = 'none';
+453|       }
+454|     });
+456|     window.addEventListener('resize', () => myChart.resize());
+457|   </script>
+458| </body>
+459| </html>
+=== 现在有、改UI前没有 (83) ===
+288|         const realKrGeoJson = await (async () => {
+289|           const res = await fetch(`../GeoJSON/South_Korea.json`);
+290|           if (!res.ok) throw new Error('HTTP ' + res.status);
+291|           return await res.json();
+292|         })();
+309|             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+318|         const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+320|         myChart.setOption({
+338|           });
+340|           } catch (e) {
+341|           console.error("地图加载失败", e);
+342|           myChart.hideLoading();
+343|           const tipEl = document.getElementById('loading-tip');
+344|           if (tipEl) {
+346|           tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+348|           }
+349|           }
+350|           }
+352|           function updateUI() {
+353|           document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+354|           document.getElementById('back-btn').innerText = i18n[currentLang].back;
+355|           }
+357|           async function initApp() {
+358|           updateUI();
+359|           await fetchData();
+360|           await renderMap();
+361|           }
+363|           initApp();
+365|           document.getElementById('lang-btn').addEventListener('click', async () => {
+366|           currentLang = currentLang === 'zh' ? 'en' : 'zh';
+367|           updateUI();
+368|           await fetchData();
+369|           await renderMap();
+370|           });
+372|           if (!isMobile) {
+373|           let isOverBox = false;
+374|           let hideTimer = null;
+375|           let currentHoverName = null;
+377|           myChart.on('mouseover', function (params) {
+378|           if (!provinceDataMap[params.name]) return;
+379|           if (isOverBox || currentHoverName === params.name) return;
+381|           clearTimeout(hideTimer);
+382|           currentHoverName = params.name;
+383|           tooltipEl.innerHTML = provinceDataMap[params.name];
+384|           tooltipEl.style.transform = 'none';
+385|           tooltipEl.style.bottom = 'auto';
+386|           tooltipEl.style.display = 'block';
+388|           if (params.event && params.event.event) {
+399|           }
+400|           });
+402|           myChart.on('mouseout', function () {
+403|           hideTimer = setTimeout(() => {
+408|           }, 300);
+409|           });
+411|           tooltipEl.addEventListener('mouseenter', () => {
+412|           isOverBox = true;
+413|           clearTimeout(hideTimer);
+414|           });
+416|           tooltipEl.addEventListener('mouseleave', () => {
+417|           isOverBox = false;
+418|           tooltipEl.style.display = 'none';
+419|           currentHoverName = null;
+420|           });
+421|           }
+423|           myChart.on('click', function(params) {
+424|           if (isMobile && provinceDataMap[params.name]) {
+425|           tooltipEl.innerHTML = provinceDataMap[params.name];
+426|           tooltipEl.style.display = 'block';
+427|           tooltipEl.style.left = '50%';
+428|           tooltipEl.style.top = 'auto';
+429|           tooltipEl.style.bottom = '50px';
+430|           tooltipEl.style.transform = 'translateX(-50%)';
+431|           }
+432|           });
+434|           myChart.getZr().on('click', function (event) {
+435|           if (isMobile && !event.target) {
+436|           tooltipEl.style.display = 'none';
+437|           }
+438|           });
+440|           window.addEventListener('resize', () => myChart.resize());
+441|           </script>
+442|           </body>
+443|           </html>

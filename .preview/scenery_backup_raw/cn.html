@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="referrer" content="no-referrer" />
+  <title>中国地景 - HorizonSimLabs</title>
+  <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
+  <meta name="color-scheme" content="dark light" />
+  <script src="../assets/theme.js"></script>
+  <link rel="stylesheet" href="../assets/theme.css">
+  <link rel="stylesheet" href="../assets/scenery.css">
+
+  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script>
+    if (!window.echarts) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+  <script>
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
+  <script src="../assets/map-style.js"></script>
+</head>
+<body>
+  <button id="back-btn" class="hsl-chip" style="top:16px;left:16px;display:none">← 返回全国</button>
+  <div class="scenery-topright">
+
+    <button id="lang-btn" class="hsl-chip hsl-chip--accent">Switch to English</button>
+
+    <button class="hsl-theme-toggle" data-theme-toggle></button>
+
+  </div>
+  
+  <div id="map"></div>
+  <div id="my-tooltip"></div>
+  <div id="loading-tip" style="display:none">正在加载中国地图…</div>
+
+  <script>
+    const tooltipEl = document.getElementById('my-tooltip');
+    const backBtn = document.getElementById('back-btn');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    let currentLang = 'zh';
+
+    const i18n = {
+      zh: {
+        back: "← 返回全国", backList: "← 返回全球", author: "作者：", download: "下载方式：",
+        free: "免费版", paid: "付费版", remark: "备注：", noLink: "无", clickDownload: "点击下载", unknown: "未知",
+        langBtn: "Switch to English"
+      },
+      en: {
+        back: "← Back to China", backList: "← Back to World", author: "Author: ", download: "Download: ",
+        free: "Free Version", paid: "Paid Version", remark: "Remark: ", noLink: "None", clickDownload: "Download", unknown: "Unknown",
+        langBtn: "切换到中文"
+      }
+    };
+
+    // 全量中英翻译字典
+    const nameTranslation = {
+      '北京': 'Beijing', '天津': 'Tianjin', '上海': 'Shanghai', '重庆': 'Chongqing',
+      '河北': 'Hebei', '山西': 'Shanxi', '辽宁': 'Liaoning', '吉林': 'Jilin', '黑龙江': 'Heilongjiang',
+      '江苏': 'Jiangsu', '浙江': 'Zhejiang', '安徽': 'Anhui', '福建': 'Fujian', '江西': 'Jiangxi',
+      '山东': 'Shandong', '河南': 'Henan', '湖北': 'Hubei', '湖南': 'Hunan', '广东': 'Guangdong',
+      '海南': 'Hainan', '四川': 'Sichuan', '贵州': 'Guizhou', '云南': 'Yunnan', '陕西': 'Shaanxi',
+      '甘肃': 'Gansu', '青海': 'Qinghai', '台湾': 'Taiwan', '内蒙古': 'Inner Mongolia', '广西': 'Guangxi',
+      '西藏': 'Tibet', '宁夏': 'Ningxia', '新疆': 'Xinjiang', '香港': 'Hong Kong', '澳门': 'Macau',
+      '石家庄': 'Shijiazhuang', '唐山': 'Tangshan', '秦皇岛': 'Qinhuangdao', '邯郸': 'Handan', '邢台': 'Xingtai', 
+      '保定': 'Baoding', '张家口': 'Zhangjiakou', '承德': 'Chengde', '沧州': 'Cangzhou', '廊坊': 'Langfang', '衡水': 'Hengshui',
+      '太原': 'Taiyuan', '大同': 'Datong', '阳泉': 'Yangquan', '长治': 'Changzhi', '晋城': 'Jincheng', 
+      '朔州': 'Shuozhou', '晋中': 'Jinzhong', '运城': 'Yuncheng', '忻州': 'Xinzhou', '临汾': 'Linfen', '吕梁': 'Lvliang',
+      '呼和浩特': 'Hohhot', '包头': 'Baotou', '乌海': 'Wuhai', '赤峰': 'Chifeng', '通辽': 'Tongliao', 
+      '鄂尔多斯': 'Ordos', '呼伦贝尔': 'Hulunbuir', '巴彦淖尔': 'Bayannur', '乌兰察布': 'Ulanqab', '兴安盟': 'Hinggan', '锡林郭勒盟': 'Xilingol', '阿拉善盟': 'Alxa',
+      '沈阳': 'Shenyang', '大连': 'Dalian', '鞍山': 'Anshan', '抚顺': 'Fushun', '本溪': 'Benxi', '丹东': 'Dandong', 
+      '锦州': 'Jinzhou', '营口': 'Yingkou', '阜新': 'Fuxin', '辽阳': 'Liaoyang', '盘锦': 'Panjin', '铁岭': 'Tieling', '朝阳': 'Chaoyang', '葫芦岛': 'Huludao',
+      '长春': 'Changchun', '吉林': 'Jilin', '四平': 'Siping', '辽源': 'Liaoyuan', '通化': 'Tonghua', '白山': 'Baishan', '松原': 'Songyuan', '白城': 'Baicheng', '延边': 'Yanbian',
+      '哈尔滨': 'Harbin', '齐齐哈尔': 'Qiqihar', '鸡西': 'Jixi', '鹤岗': 'Hegang', '双鸭山': 'Shuangyashan', '大庆': 'Daqing', 
+      '伊春': 'Yichun', '佳木斯': 'Jiamusi', '七台河': 'Qitaihe', '牡丹江': 'Mudanjiang', '黑河': 'Heihe', '绥化': 'Suihua', '大兴安岭': 'Daxinganling',
+      '南京': 'Nanjing', '无锡': 'Wuxi', '徐州': 'Xuzhou', '常州': 'Changzhou', '苏州': 'Suzhou', '南通': 'Nantong', 
+      '连云港': 'Lianyungang', '淮安': 'Huaian', '盐城': 'Yancheng', '扬州': 'Yangzhou', '镇江': 'Zhenjiang', '泰州': 'Taizhou', '宿迁': 'Suqian',
+      '杭州': 'Hangzhou', '宁波': 'Ningbo', '温州': 'Wenzhou', '嘉兴': 'Jiaxing', '湖州': 'Huzhou', '绍兴': 'Shaoxing', 
+      '金华': 'Jinhua', '衢州': 'Quzhou', '舟山': 'Zhoushan', '台州': 'Taizhou', '丽水': 'Lishui',
+      '合肥': 'Hefei', '芜湖': 'Wuhu', '蚌埠': 'Bengbu', '淮南': 'Huainan', '马鞍山': 'Maanshan', '淮北': 'Huaibei', 
+      '铜陵': 'Tongling', '安庆': 'Anqing', '黄山': 'Huangshan', '滁州': 'Chuzhou', '阜阳': 'Fuyang', '宿州': 'Suzhou', '六安': 'Luan', '亳州': 'Bozhou', '池州': 'Chizhou', '宣城': 'Xuancheng',
+      '福州': 'Fuzhou', '厦门': 'Xiamen', '莆田': 'Putian', '三明': 'Sanming', '泉州': 'Quanzhou', '漳州': 'Zhangzhou', '南平': 'Nanping', '龙岩': 'Longyan', '宁德': 'Ningde',
+      '南昌': 'Nanchang', '景德镇': 'Jingdezhen', '萍乡': 'Pingxiang', '九江': 'Jiujiang', '新余': 'Xinyu', 
+      '鹰潭': 'Yingtan', '赣州': 'Ganzhou', '吉安': 'Jian', '宜春': 'Yichun', '抚州': 'Fuzhou', '上饶': 'Shangrao',
+      '济南': 'Jinan', '青岛': 'Qingdao', '淄博': 'Zibo', '枣庄': 'Zaozhuang', '东营': 'Dongying', '烟台': 'Yantai', 
+      '潍坊': 'Weifang', '济宁': 'Jining', '泰安': 'Taian', '威海': 'Weihai', '日照': 'Rizhao', '临沂': 'Linyi', '德州': 'Dezhou', '聊城': 'Liaocheng', '滨州': 'Binzhou', '菏泽': 'Heze',
+      '郑州': 'Zhengzhou', '开封': 'Kaifeng', '洛阳': 'Luoyang', '平顶山': 'Pingdingshan', '安阳': 'Anyang', '鹤壁': 'Hebi', 
+      '新乡': 'Xinxiang', '焦作': 'Jiaozuo', '濮阳': 'Puyang', '许昌': 'Xuchang', '漯河': 'Luohe', '三门峡': 'Sanmenxia', '南阳': 'Nanyang', '商丘': 'Shangqiu', '信阳': 'Xinyang', '周口': 'Zhoukou', '驻马店': 'Zhumadian', '济源': 'Jiyuan',
+      '武汉': 'Wuhan', '黄石': 'Huangshi', '十堰': 'Shiyan', '宜昌': 'Yichang', '襄阳': 'Xiangyang', '鄂州': 'Ezhou', '荆门': 'Jingmen', '孝感': 'Xiaogan', '荆州': 'Jingzhou', '黄冈': 'Huanggang', '咸宁': 'Xianning', '随州': 'Suizhou', '恩施': 'Enshi', '仙桃': 'Xiantao', '潜江': 'Qianjiang', '天门': 'Tianmen', '神农架': 'Shennongjia',
+      '长沙': 'Changsha', '株洲': 'Zhuzhou', '湘潭': 'Xiangtan', '衡阳': 'Hengyang', '邵阳': 'Shaoyang', '岳阳': 'Yueyang', '常德': 'Changde', '张家界': 'Zhangjiajie', '益阳': 'Yiyang', '郴州': 'Chenzhou', '永州': 'Yongzhou', '怀化': 'Huaihua', '娄底': 'Loudi', '湘西': 'Xiangxi',
+      '广州': 'Guangzhou', '韶关': 'Shaoguan', '深圳': 'Shenzhen', '珠海': 'Zhuhai', '汕头': 'Shantou', '佛山': 'Foshan', '江门': 'Jiangmen', '湛江': 'Zhanjiang', '茂名': 'Maoming', '肇庆': 'Zhaoqing', '惠州': 'Huizhou', '梅州': 'Meizhou', '汕尾': 'Shanwei', '河源': 'Heyuan', '阳江': 'Yangjiang', '清远': 'Qingyuan', '东莞': 'Dongguan', '中山': 'Zhongshan', '潮州': 'Chaozhou', '揭阳': 'Jieyang', '云浮': 'Yunfu',
+      '南宁': 'Nanning', '柳州': 'Liuzhou', '桂林': 'Guilin', '梧州': 'Wuzhou', '北海': 'Beihai', '防城港': 'Fangchenggang', '钦州': 'Qinzhou', '贵港': 'Guigang', '玉林': 'Yulin', '百色': 'Baise', '贺州': 'Hezhou', '河池': 'Hechi', '来宾': 'Laibin', '崇左': 'Chongzuo',
+      '海口': 'Haikou', '三亚': 'Sanya', '三沙': 'Sansha', '儋州': 'Danzhou', '五指山': 'Wuzhishan', '琼海': 'Qionghai', '文昌': 'Wenchang', '万宁': 'Wanning', '东方': 'Dongfang',
+      '成都': 'Chengdu', '自贡': 'Zigong', '攀枝花': 'Panzhihua', '泸州': 'Luzhou', '德阳': 'Deyang', '绵阳': 'Mianyang', '广元': 'Guangyuan', '遂宁': 'Suining', '内江': 'Neijiang', '乐山': 'Leshan', '南充': 'Nanchong', '眉山': 'Meishan', '宜宾': 'Yibin', '广安': 'Guangan', '达州': 'Dazhou', '雅安': 'Yaan', '巴中': 'Bazhong', '资阳': 'Ziyang', '阿坝': 'Aba', '甘孜': 'Garze', '凉山': 'Liangshan',
+      '贵阳': 'Guiyang', '六盘水': 'Liupanshui', '遵义': 'Zunyi', '安顺': 'Anshun', '毕节': 'Bijie', '铜仁': 'Tongren', '黔西南': 'Qianxinan', '黔东南': 'Qiandongnan', '黔南': 'Qiannan',
+      '昆明': 'Kunming', '曲靖': 'Qujing', '玉溪': 'Yuxi', '保山': 'Baoshan', '昭通': 'Zhaotong', '丽江': 'Lijiang', '普洱': 'Puer', '临沧': 'Lincang', '楚雄': 'Chuxiong', '红河': 'Honghe', '文山': 'Wenshan', '西双版纳': 'Xishuangbanna', '大理': 'Dali', '德宏': 'Dehong', '怒江': 'Nujiang', '迪庆': 'Diqing',
+      '拉萨': 'Lhasa', '日喀则': 'Shigatse', '昌都': 'Qamdo', '林芝': 'Nyingchi', '山南': 'Shannan', '那曲': 'Nagqu', '阿里': 'Ngari',
+      '西安': 'Xian', '铜川': 'Tongchuan', '宝鸡': 'Baoji', '咸阳': 'Xianyang', '渭南': 'Weinan', '延安': 'Yanan', '汉中': 'Hanzhong', '榆林': 'Yulin', '安康': 'Ankang', '商洛': 'Shangluo',
+      '兰州': 'Lanzhou', '嘉峪关': 'Jiayuguan', '金昌': 'Jinchang', '白银': 'Baiyin', '天水': 'Tianshui', '武威': 'Wuwei', '张掖': 'Zhangye', '平凉': 'Pingliang', '酒泉': 'Jiuquan', '庆阳': 'Qingyang', '定西': 'Dingxi', '陇南': 'Longnan', '临夏': 'Linxia', '甘南': 'Gannan',
+      '西宁': 'Xining', '海东': 'Haidong', '海北': 'Haibei', '黄南': 'Huangnan', '海南州': 'Hainan', '果洛': 'Golog', '玉树': 'Yushu', '海西': 'Haixi',
+      '银川': 'Yinchuan', '石嘴山': 'Shizuishan', '吴忠': 'Wuzhong', '固原': 'Guyuan', '中卫': 'Zhongwei',
+      '乌鲁木齐': 'Urumqi', '克拉玛依': 'Karamay', '吐鲁番': 'Turpan', '哈密': 'Hami', '昌吉': 'Changji', '博尔塔拉': 'Bortala', '巴音郭楞': 'Bayingolin', '阿克苏': 'Aksu', '克孜勒苏': 'Kizilsu', '喀什': 'Kashgar', '和田': 'Hotan', '伊犁': 'Ili', '塔城': 'Tacheng', '阿勒泰': 'Altay'
+    };
+
+    const provinceShortMap = {
+      '北京市': '北京', '天津市': '天津', '上海市': '上海', '重庆市': '重庆',
+      '河北省': '河北', '山西省': '山西', '辽宁省': '辽宁', '吉林省': '吉林', '黑龙江省': '黑龙江', 
+      '江苏省': '江苏', '浙江省': '浙江', '安徽省': '安徽', '福建省': '福建', '江西省': '江西', 
+      '山东省': '山东', '河南省': '河南', '湖北省': '湖北', '湖南省': '湖南', '广东省': '广东', 
+      '海南省': '海南', '四川省': '四川', '贵州省': '贵州', '云南省': '云南', '陕西省': '陕西',
+      '甘肃省': '甘肃', '青海省': '青海', '台湾省': '台湾', '内蒙古自治区': '内蒙古', 
+      '广西壮族自治区': '广西', '西藏自治区': '西藏', '宁夏回族自治区': '宁夏', '新疆维吾尔自治区': '新疆',
+      '香港特别行政区': '香港', '澳门特别行政区': '澳门'
+    };
+
+    const provinceCodeMap = {
+      '北京市': 110000, '天津市': 120000, '河北省': 130000, '山西省': 140000, '内蒙古自治区': 150000,
+      '辽宁省': 210000, '吉林省': 220000, '黑龙江省': 230000, '上海市': 310000, '江苏省': 320000,
+      '浙江省': 330000, '安徽省': 340000, '福建省': 350000, '江西省': 360000, '山东省': 370000,
+      '河南省': 410000, '湖北省': 420000, '湖南省': 430000, '广东省': 440000, '广西壮族自治区': 450000,
+      '海南省': 460000, '重庆市': 500000, '四川省': 510000, '贵州省': 520000, '云南省': 530000,
+      '西藏自治区': 540000, '陕西省': 610000, '甘肃省': 620000, '青海省': 630000, '宁夏回族自治区': 640000,
+      '新疆维吾尔自治区': 650000, '台湾省': 710000, '香港特别行政区': 810000, '澳门特别行政区': 820000
+    };
+
+    const superCityMap = {
+      '石家庄': '河北省', '唐山': '河北省', '秦皇岛': '河北省', '邯郸': '河北省', '邢台': '河北省', '保定': '河北省', '张家口': '河北省', '承德': '河北省', '沧州': '河北省', '廊坊': '河北省', '衡水': '河北省',
+      '太原': '山西省', '大同': '山西省', '阳泉': '山西省', '长治': '山西省', '晋城': '山西省', '朔州': '山西省', '晋中': '山西省', '运城': '山西省', '忻州': '山西省', '临汾': '山西省', '吕梁': '山西省',
+      '呼和浩特': '内蒙古自治区', '包头': '内蒙古自治区', '乌海': '内蒙古自治区', '赤峰': '内蒙古自治区', '通辽': '内蒙古自治区', '鄂尔多斯': '内蒙古自治区', '呼伦贝尔': '内蒙古自治区', '巴彦淖尔': '内蒙古自治区', '乌兰察布': '内蒙古自治区',
+      '沈阳': '辽宁省', '大连': '辽宁省', '鞍山': '辽宁省', '抚顺': '辽宁省', '本溪': '辽宁省', '丹东': '辽宁省', '锦州': '辽宁省', '营口': '辽宁省', '阜新': '辽宁省', '辽阳': '辽宁省', '盘锦': '辽宁省', '铁岭': '辽宁省', '朝阳': '辽宁省', '葫芦岛': '辽宁省',
+      '长春': '吉林省', '吉林': '吉林省', '四平': '吉林省', '辽源': '吉林省', '通化': '吉林省', '白山': '吉林省', '松原': '吉林省', '白城': '吉林省', '延边': '吉林省',
+      '哈尔滨': '黑龙江省', '齐齐哈尔': '黑龙江省', '鸡西': '黑龙江省', '鹤岗': '黑龙江省', '双鸭山': '黑龙江省', '大庆': '黑龙江省', '伊春': '黑龙江省', '佳木斯': '黑龙江省', '七台河': '黑龙江省', '牡丹江': '黑龙江省', '黑河': '黑龙江省', '绥化': '黑龙江省', '大兴安岭': '黑龙江省',
+      '南京': '江苏省', '无锡': '江苏省', '徐州': '江苏省', '常州': '江苏省', '苏州': '江苏省', '南通': '江苏省', '连云港': '江苏省', '淮安': '江苏省', '盐城': '江苏省', '扬州': '江苏省', '镇江': '江苏省', '泰州': '江苏省', '宿迁': '江苏省',
+      '杭州': '浙江省', '宁波': '浙江省', '温州': '浙江省', '嘉兴': '浙江省', '湖州': '浙江省', '绍兴': '浙江省', '金华': '浙江省', '衢州': '浙江省', '舟山': '浙江省', '台州': '浙江省', '丽水': '浙江省',
+      '合肥': '安徽省', '芜湖': '安徽省', '蚌埠': '安徽省', '淮南': '安徽省', '马鞍山': '安徽省', '淮北': '安徽省', '铜陵': '安徽省', '安庆': '安徽省', '黄山': '安徽省', '滁州': '安徽省', '阜阳': '安徽省', '宿州': '安徽省', '六安': '安徽省', '亳州': '安徽省', '池州': '安徽省', '宣城': '安徽省',
+      '福州': '福建省', '厦门': '福建省', '莆田': '福建省', '三明': '福建省', '泉州': '福建省', '漳州': '福建省', '南平': '福建省', '龙岩': '福建省', '宁德': '福建省',
+      '南昌': '江西省', '景德镇': '江西省', '萍乡': '江西省', '九江': '江西省', '新余': '江西省', '鹰潭': '江西省', '赣州': '江西省', '吉安': '江西省', '宜春': '江西省', '抚州': '江西省', '上饶': '江西省',
+      '济南': '山东省', '青岛': '山东省', '淄博': '山东省', '枣庄': '山东省', '东营': '山东省', '烟台': '山东省', '潍坊': '山东省', '济宁': '山东省', '泰安': '山东省', '威海': '山东省', '日照': '山东省', '临沂': '山东省', '德州': '山东省', '聊城': '山东省', '滨州': '山东省', '菏泽': '山东省',
+      '郑州': '河南省', '开封': '河南省', '洛阳': '河南省', '平顶山': '河南省', '安阳': '河南省', '鹤壁': '河南省', '新乡': '河南省', '焦作': '河南省', '濮阳': '河南省', '许昌': '河南省', '漯河': '河南省', '三门峡': '河南省', '南阳': '河南省', '商丘': '河南省', '信阳': '河南省', '周口': '河南省', '驻马店': '河南省', '济源': '河南省',
+      '武汉': '湖北省', '黄石': '湖北省', '十堰': '湖北省', '宜昌': '湖北省', '襄阳': '湖北省', '鄂州': '湖北省', '荆门': '湖北省', '孝感': '湖北省', '荆州': '湖北省', '黄冈': '湖北省', '咸宁': '湖北省', '随州': '湖北省', '恩施': '湖北省', '仙桃': '湖北省', '潜江': '湖北省', '天门': '湖北省', '神农架': '湖北省',
+      '长沙': '湖南省', '株洲': '湖南省', '湘潭': '湖南省', '衡阳': '湖南省', '邵阳': '湖南省', '岳阳': '湖南省', '常德': '湖南省', '张家界': '湖南省', '益阳': '湖南省', '郴州': '湖南省', '永州': '湖南省', '怀化': '湖南省', '娄底': '湖南省', '湘西': '湖南省',
+      '广州': '广东省', '韶关': '广东省', '深圳': '广东省', '珠海': '广东省', '汕头': '广东省', '佛山': '广东省', '江门': '广东省', '湛江': '广东省', '茂名': '广东省', '肇庆': '广东省', '惠州': '广东省', '梅州': '广东省', '汕尾': '广东省', '河源': '广东省', '阳江': '广东省', '清远': '广东省', '东莞': '广东省', '中山': '广东省', '潮州': '广东省', '揭阳': '广东省', '云浮': '广东省',
+      '南宁': '广西壮族自治区', '柳州': '广西壮族自治区', '桂林': '广西壮族自治区', '梧州': '广西壮族自治区', '北海': '广西壮族自治区', '防城港': '广西壮族自治区', '钦州': '广西壮族自治区', '贵港': '广西壮族自治区', '玉林': '广西壮族自治区', '百色': '广西壮族自治区', '贺州': '广西壮族自治区', '河池': '广西壮族自治区', '来宾': '广西壮族自治区', '崇左': '广西壮族自治区',
+      '海口': '海南省', '三亚': '海南省', '三沙': '海南省', '儋州': '海南省', '五指山': '海南省', '琼海': '海南省', '文昌': '海南省', '万宁': '海南省', '东方': '海南省',
+      '成都': '四川省', '自贡': '四川省', '攀枝花': '四川省', '泸州': '四川省', '德阳': '四川省', '绵阳': '四川省', '广元': '四川省', '遂宁': '四川省', '内江': '四川省', '乐山': '四川省', '南充': '四川省', '眉山': '四川省', '宜宾': '四川省', '广安': '四川省', '达州': '四川省', '雅安': '四川省', '巴中': '四川省', '资阳': '四川省', '阿坝': '四川省', '甘孜': '四川省', '凉山': '四川省',
+      '贵阳': '贵州省', '六盘水': '贵州省', '遵义': '贵州省', '安顺': '贵州省', '毕节': '贵州省', '铜仁': '贵州省', '黔西南': '贵州省', '黔东南': '贵州省', '黔南': '贵州省',
+      '昆明': '云南省', '曲靖': '云南省', '玉溪': '云南省', '保山': '云南省', '昭通': '云南省', '丽江': '云南省', '普洱': '云南省', '临沧': '云南省', '楚雄': '云南省', '红河': '云南省', '文山': '云南省', '西双版纳': '云南省', '大理': '云南省', '德宏': '云南省', '怒江': '云南省', '迪庆': '云南省',
+      '拉萨': '西藏自治区', '日喀则': '西藏自治区', '昌都': '西藏自治区', '林芝': '西藏自治区', '山南': '西藏自治区', '那曲': '西藏自治区', '阿里': '西藏自治区',
+      '西安': '陕西省', '铜川': '陕西省', '宝鸡': '陕西省', '咸阳': '陕西省', '渭南': '陕西省', '延安': '陕西省', '汉中': '陕西省', '榆林': '陕西省', '安康': '陕西省', '商洛': '陕西省',
+      '兰州': '甘肃省', '嘉峪关': '甘肃省', '金昌': '甘肃省', '白银': '甘肃省', '天水': '甘肃省', '武威': '甘肃省', '张掖': '甘肃省', '平凉': '甘肃省', '酒泉': '甘肃省', '庆阳': '甘肃省', '定西': '甘肃省', '陇南': '甘肃省', '临夏': '甘肃省', '甘南': '甘肃省',
+      '西宁': '青海省', '海东': '青海省', '海北': '青海省', '黄南': '青海省', '海南州': '青海省', '果洛': '青海省', '玉树': '青海省', '海西': '青海省',
+      '银川': '宁夏回族自治区', '石嘴山': '宁夏回族自治区', '吴忠': '宁夏回族自治区', '固原': '宁夏回族自治区', '中卫': '宁夏回族自治区',
+      '乌鲁木齐': '新疆维吾尔自治区', '克拉玛依': '新疆维吾尔自治区', '吐鲁番': '新疆维吾尔自治区', '哈密': '新疆维吾尔自治区', '昌吉': '新疆维吾尔自治区', '博尔塔拉': '新疆维吾尔自治区', '巴音郭楞': '新疆维吾尔自治区', '阿克苏': '新疆维吾尔自治区', '克孜勒苏': '新疆维吾尔自治区', '喀什': '新疆维吾尔自治区', '和田': '新疆维吾尔自治区', '伊犁': '新疆维吾尔自治区', '塔城': '新疆维吾尔自治区', '阿勒泰': '新疆维吾尔自治区'
+    };
+
+    let allParsedData = []; 
+    let allowedDrillProvinces = new Set(); 
+    const provinceDataMap = {};
+    let currentMapId = null;
+
+    function getTranslatedName(rawName) {
+      if (currentLang === 'zh') return rawName;
+
+      let clean = rawName
+        .replace(/(省|市|自治区|特别行政区|自治州|地区|盟|县|区|土家族|苗族|藏族|羌族|彝族|傣族|白族|哈尼族|壮族|回族|蒙古族|朝鲜族|哈萨克|柯尔克孜|自治|族)/g, '')
+        .trim();
+
+      if (nameTranslation[clean]) return nameTranslation[clean];
+      if (nameTranslation[rawName]) return nameTranslation[rawName];
+      
+      for (let key in nameTranslation) {
+        if (clean.includes(key) || key.includes(clean)) {
+          return nameTranslation[key];
+        }
+      }
+      
+      return clean;
+    }
+
+    function parseBilingual(text) {
+      if (!text) return '';
+      const parts = text.split('|');
+      if (currentLang === 'zh') return parts[0].trim();
+      return (parts[1] || parts[0]).trim();
+    }
+
+    function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
+      const t = i18n[currentLang];
+      
+      const displayAuthor = parseBilingual(author);
+      const displayFreeLevel = parseBilingual(freeLevel);
+      const displayPaidLevel = parseBilingual(paidLevel);
+      const displayRemark = parseBilingual(remark);
+      
+      const parsedFreeLink = parseBilingual(freeLink);
+      const parsedPaidLink = parseBilingual(paidLink);
+
+      const titleName = getTranslatedName(rawProvince);
+
+      let html = `<div class="tip-title">${titleName}</div>`;
+      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
+      html += `<div>${t.download}</div>`;
+      
+      function formatLink(link) {
+        if (!link || link === '无' || link === 'None' || link === 'null') {
+          return t.noLink;
+        }
+        const lowerText = link.toLowerCase();
+        if (lowerText.startsWith('http://') || lowerText.startsWith('https://')) {
+          return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
+        } else {
+          return `<span style="color:var(--text-dim); font-weight:bold;">${link}</span>`;
+        }
+      }
+
+      if (parsedFreeLink || displayFreeLevel) {
+        html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
+      }
+      
+      if (parsedPaidLink || displayPaidLevel) {
+        html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
+      }
+      
+      if (displayRemark) {
+        html += `<div class="tip-remark">${t.remark}${displayRemark}</div>`;
+      }
+      
+      return html;
+    }
+
+    const myChart = echarts.init(document.getElementById('map'));
+
+    // ==================== done.json 解析 ====================
+    // ★ 必须按「行」解析。
+    //   done.json 里很多备注带英文逗号，例如
+    //     "...;属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG"
+    //   如果用 split(',') 切，这一条会被切成两段，正则再去掉引号和换行后，
+    //   相邻两行就会粘在一起，产生不存在的"城市"、并截断备注。
+    function parseDoneJson(rawText) {
+      const result = [];
+      if (!rawText) return result;
+
+      const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
+
+      body.split(/\r?\n/).forEach(line => {
+        let l = line.trim();
+        if (!l) return;
+
+        // 逐行剥掉 JSON 数组的行尾逗号与首尾引号（不会被正文里的逗号影响）
+        l = l.replace(/,\s*$/, '').trim();
+        l = l.replace(/^"/, '').replace(/"$/, '').trim();
+        if (!l) return;
+
+        l = l.replace(/；/g, ';');   // 兼容中文分号
+
+        const parts = l.split(';');
+        const rawProvince = (parts[0] || '').trim();
+        if (!rawProvince) return;
+
+        // 备注里可能还有分号，全部并入备注
+        const remark = parts.length > 6 ? parts.slice(6).join(';') : (parts[6] || '');
+
+        result.push({
+          rawProvince: rawProvince,
+          author: parts[1] || i18n[currentLang].unknown,
+          freeLink: parts[2] || '', freeLevel: parts[3] || '',
+          paidLink: parts[4] || '', paidLevel: parts[5] || '',
+          remark: remark
+        });
+      });
+
+      return result;
+    }
+
+    async function fetchData() {
+      allParsedData = [];
+      allowedDrillProvinces.clear();
+      const t = i18n[currentLang];
+
+      try {
+        // ★ 核心修改：done.json 在站点根目录，本页位于 /scenery/，所以要用 ../done.json
+        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        
+        if (doneRes.ok) {
+          // ★ 按行解析，避免备注里的英文逗号把条目切断
+          const entries = parseDoneJson(await doneRes.text());
+
+          entries.forEach(itemData => {
+            const rawProvince = itemData.rawProvince;
+
+            const cleanName = rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
+            
+            if (superCityMap[cleanName]) {
+              itemData.provinceName = superCityMap[cleanName];
+              allowedDrillProvinces.add(itemData.provinceName);
+            } else {
+              itemData.provinceName = rawProvince;
+            }
+            allParsedData.push(itemData);
+          });
+        }
+      } catch (e) { console.error("读取数据失败", e); }
+    }
+
+    // ==================== 本地 GeoJSON/China.json ====================
+    // China.json 是阿里云 DataV 的扁平数据：省级要素只有「台湾省」一条，
+    // 其余全是 city / district 级别的子要素。所以：
+    //   • 全国视图：按 adcode 前两位把子要素聚合成 34 个省级轮廓；
+    //   • 下钻视图：直接取该省 adcode 前两位的所有子要素（市 / 区）。
+    const CHINA_GEOJSON_FILE = 'China.json';
+    let chinaRawGeoJson = null;
+    const chinaProvinceMaps = {};   // 省级聚合轮廓缓存
+
+    function topCode(adcode) { return String(adcode || '').slice(0, 2); }
+
+    function sortedFeatureNames(features) {
+      return features.map(f => f.properties.name)
+        .filter(n => n)
+        .sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+    }
+
+    // 全国视图：返回 { geoJson, featureNames, nameToShort }
+    function buildProvinceGeoJson(rawGeoJson) {
+      if (chinaProvinceMaps.__all__) return chinaProvinceMaps.__all__;
+
+      const groups = {};
+      rawGeoJson.features.forEach(feature => {
+        const props = feature.properties || {};
+        if (!feature.geometry || !props.adcode) return;              // 跳过南海诸岛等无 adcode 的要素
+        const code = topCode(props.adcode);
+        if (code === '10') return;
+        (groups[code] = groups[code] || []).push(feature);
+      });
+
+      const features = [];
+      const nameToShort = {};
+      Object.keys(groups).forEach(code => {
+        const provFullName = provinceNameByCode(code);
+        if (!provFullName) return;
+        const shortName = provinceShortMap[provFullName] || provFullName;
+        nameToShort[provFullName] = shortName;
+        const geometry = mergeFeatureGeometry(groups[code]);
+        if (!geometry) return;
+        features.push({
+          type: 'Feature',
+          properties: { name: provFullName, adcode: Number(code) * 10000 },
+          geometry: geometry
+        });
+      });
+
+      // 台湾省在数据里本身就是一个省级要素，单独并入
+      const taiwan = rawGeoJson.features.find(f =>
+        f.properties && f.properties.level === 'province' && f.geometry);
+      if (taiwan && !features.some(f => f.properties.adcode === 710000)) {
+        features.push({
+          type: 'Feature',
+          properties: { name: '台湾省', adcode: 710000 },
+          geometry: taiwan.geometry
+        });
+        nameToShort['台湾省'] = '台湾';
+      }
+
+      const out = {
+        geoJson: { type: 'FeatureCollection', features: features },
+        featureNames: sortedFeatureNames(features),
+        nameToShort: nameToShort
+      };
+      chinaProvinceMaps.__all__ = out;
+      return out;
+    }
+
+    // 省级轮廓：把该省所有子要素的多边形直接合并成一个 MultiPolygon
+    function mergeFeatureGeometry(features) {
+      const polygons = [];
+      features.forEach(f => {
+        const g = f.geometry;
+        if (!g || !g.coordinates) return;
+        const flat = [];
+        (function walk(node, container) {
+          if (!Array.isArray(node) || node.length === 0) return;
+          if (typeof node[0][0] === 'number' && typeof node[0][1] === 'number') {
+            container.push(node);
+            return;
+          }
+          node.forEach(child => walk(child, container));
+        })(g.coordinates, flat);
+        flat.forEach(ring => polygons.push([ring]));
+      });
+      if (!polygons.length) return null;
+      return { type: 'MultiPolygon', coordinates: polygons };
+    }
+
+    function provinceNameByCode(code) {
+      for (const full in provinceCodeMap) {
+        if (topCode(provinceCodeMap[full]) === code) return full;
+      }
+      return null;
+    }
+
+    function buildSubMapGeoJson(rawGeoJson, code) {
+      const cacheKey = 'code_' + code;
+      if (chinaProvinceMaps[cacheKey]) return chinaProvinceMaps[cacheKey];
+
+      const features = rawGeoJson.features.filter(f =>
+        f.geometry && f.properties && topCode(f.properties.adcode) === code);
+      if (!features.length) return null;
+
+      const out = {
+        geoJson: { type: 'FeatureCollection', features: features },
+        featureNames: sortedFeatureNames(features),
+        nameToShort: {}
+      };
+      chinaProvinceMaps[cacheKey] = out;
+      return out;
+    }
+
+    function showMapLoading() {
+      myChart.showLoading({ text: '', color: getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#4d8dff', maskColor: 'transparent' });
+    }
+
+    function hideMapLoading() {
+      myChart.hideLoading();
+      const tip = document.getElementById('loading-tip');
+      if (tip) tip.style.display = 'none';
+    }
+
+    async function renderMap(mapId = null, isProvince = false) {
+      const t = i18n[currentLang];
+      currentMapId = mapId;
+      showMapLoading();
+
+      try {
+        if (!chinaRawGeoJson) {
+          chinaRawGeoJson = await HSLGeo.loadGeoJson(CHINA_GEOJSON_FILE);
+        }
+
+        const isNational = !mapId;
+
+        let frame;
+        if (isNational) {
+          frame = buildProvinceGeoJson(chinaRawGeoJson);
+          if (!frame || !frame.geoJson.features.length) throw new Error('China.json 中没有找到可用的省级要素');
+          echarts.registerMap('china', frame.geoJson);
+        } else {
+          frame = buildSubMapGeoJson(chinaRawGeoJson, topCode(mapId));
+          if (!frame) throw new Error('China.json 中没有找到该省的下级行政区');
+          echarts.registerMap('cn_sub', frame.geoJson);
+        }
+
+        const currentMapName = isNational ? 'china' : 'cn_sub';
+        const colors = HSLGeo.mapColors();
+        const mapData = [];
+
+        for (let key in provinceDataMap) { delete provinceDataMap[key]; }
+
+        const completedProvincesShort = allParsedData
+          .map(item => provinceShortMap[item.rawProvince] || item.rawProvince)
+          .filter(shortName => shortName !== undefined);
+
+        frame.featureNames.forEach(featureName => {
+          if (!isNational) {
+            // ---- 省级下钻：逐个市 / 区匹配 ----
+            const matchItem = allParsedData.find(item => {
+              const itemRaw = item.rawProvince;
+              const fRaw = featureName;
+              if (fRaw.includes('恩施') && itemRaw.includes('恩施')) return true;
+              const itemClean = itemRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              const fClean = fRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              return itemClean === fClean || itemClean.includes(fClean) || fClean.includes(itemClean);
+            });
+            if (matchItem) {
+              mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit', colors) });
+              provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+            }
+            return;
+          }
+
+          // ---- 全国视图：逐省判断整体完成 / 部分完成 / 未完成 ----
+          const featureShort = frame.nameToShort[featureName] || provinceShortMap[featureName] || featureName;
+          const isWhole = completedProvincesShort.includes(featureShort) || completedProvincesShort.includes(featureName);
+
+          if (isWhole) {
+            mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit', colors) });
+            const matchItem = allParsedData.find(item => item.rawProvince === featureShort || item.rawProvince === featureName);
+            if (matchItem) {
+              provinceDataMap[featureName] = buildHtml(matchItem.rawProvince, matchItem.author, matchItem.freeLink, matchItem.freeLevel, matchItem.paidLink, matchItem.paidLevel, matchItem.remark);
+            }
+            return;
+          }
+
+          // 该省下面的市 / 区里有没有地景？
+          const cityItems = allParsedData.filter(item => {
+            if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
+            const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
+            const prov = superCityMap[cleanName];
+            if (!prov) return false;
+            const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
+            return provShort === featureShort;
+          });
+
+          if (cityItems.length) {
+            mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('partial', colors) });
+            // 先列出该省的市级地景，再补上「全省包」条目（若有）
+            const parts = cityItems
+              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark));
+            if (parts.length) {
+              provinceDataMap[featureName] = parts.join('<hr class="tip-remark">');
+            } else {
+              delete provinceDataMap[featureName];
+            }
+          }
+        });
+
+        const style = HSLGeo.mapSeriesStyle({
+          labelShow: true,
+          fontSize: isMobile ? 7 : 10
+        });
+
+        hideMapLoading();
+        myChart.setOption({
+          backgroundColor: 'transparent',
+          tooltip: { show: false },
+          series: [{
+            type: 'map',
+            map: currentMapName,
+            roam: true,
+            zoom: isProvince ? 1.1 : (isMobile ? 1.2 : 1.4),
+            center: isProvince ? undefined : [104, 36],
+            label: Object.assign({}, style.label, {
+              formatter: function (params) { return provinceDataMap[params.name] ? getTranslatedName(params.name) : ''; }
+            }),
+            itemStyle: style.itemStyle,
+            emphasis: style.emphasis,
+            selectedMode: false,
+            data: mapData
+          }]
+        }, true);
+
+        backBtn.style.display = isProvince ? 'inline-flex' : 'none';
+        backBtn.innerText = isProvince ? t.back : t.backList;
+        backBtn.onclick = isProvince ? () => renderMap(null, false) : () => window.location.href = '../scenery.html';
+
+      } catch (e) {
+        console.error("地图加载失败", e);
+        myChart.hideLoading();
+        const tip = document.getElementById('loading-tip');
+        if (tip) {
+          tip.style.display = 'block';
+          tip.classList.add('is-error');
+          tip.innerText = currentLang === 'zh'
+            ? '加载本地 GeoJSON/China.json 失败，请检查文件是否存在。'
+            : 'Failed to load local GeoJSON/China.json.';
+        }
+      }
+    }
+
+    function updateUI() {
+      document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+      backBtn.innerText = i18n[currentLang].backList;
+    }
+
+    async function initApp() {
+      updateUI();
+      await fetchData();
+      await renderMap(null, false);
+    }
+
+    initApp();
+
+    document.getElementById('lang-btn').addEventListener('click', async () => {
+      currentLang = currentLang === 'zh' ? 'en' : 'zh';
+      updateUI();
+      await fetchData();
+      await renderMap(currentMapId, currentMapId !== null);
+    });
+
+    let lastClickTime = 0;
+    let lastClickName = '';
+
+    myChart.on('click', function (params) {
+      const now = new Date().getTime();
+      const provinceName = params.name;
+      
+      const cleanProvName = (provinceShortMap[provinceName] || provinceName.replace(/(省|市|自治区|特别行政区)/g, '')).trim();
+      let canDrill = false;
+      
+      for (let prov of allowedDrillProvinces) {
+        const pShort = (provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '')).trim();
+        if (pShort === cleanProvName) {
+          canDrill = true;
+          break;
+        }
+      }
+
+      if (isMobile) {
+        if (now - lastClickTime < 300 && lastClickName === provinceName) {
+          if (canDrill && backBtn.style.display === 'none') {
+             let mapId = null;
+             for (let key in provinceCodeMap) {
+               const shortKey = (provinceShortMap[key] || key.replace(/(省|市|自治区)/g, '')).trim();
+               if (shortKey === cleanProvName) {
+                  mapId = provinceCodeMap[key];
+                  break;
+               }
+             }
+             if (mapId) {
+               tooltipEl.style.display = 'none';
+               renderMap(mapId, true);
+             }
+          } else if (provinceDataMap[provinceName]) {
+            tooltipEl.innerHTML = provinceDataMap[provinceName];
+            tooltipEl.style.display = 'block';
+            tooltipEl.style.left = '50%';
+            tooltipEl.style.top = 'auto';
+            tooltipEl.style.bottom = '50px';
+            tooltipEl.style.transform = 'translateX(-50%)';
+          } else {
+            tooltipEl.style.display = 'none';
+          }
+        }
+        lastClickTime = now;
+        lastClickName = provinceName;
+      } else {
+        if (canDrill && backBtn.style.display === 'none') {
+          let mapId = null;
+          for (let key in provinceCodeMap) {
+            const shortKey = (provinceShortMap[key] || key.replace(/(省|市|自治区)/g, '')).trim();
+            if (shortKey === cleanProvName) {
+               mapId = provinceCodeMap[key];
+               break;
+            }
+          }
+          if (mapId) {
+            renderMap(mapId, true);
+          }
+        } else if (provinceDataMap[provinceName]) {
+          tooltipEl.innerHTML = provinceDataMap[provinceName];
+          tooltipEl.style.transform = 'none';
+          tooltipEl.style.bottom = 'auto';
+          tooltipEl.style.display = 'block';
+          tooltipEl.style.left = '50%';
+          tooltipEl.style.top = '50%';
+          tooltipEl.style.translate = '-50% -50%';
+        } else {
+          tooltipEl.style.display = 'none';
+        }
+      }
+    });
+
+    myChart.getZr().on('click', function (event) {
+      if (isMobile && !event.target) {
+        tooltipEl.style.display = 'none';
+      }
+    });
+
+    if (!isMobile) {
+      let isOverBox = false;
+      let hideTimer = null;
+      let currentHoverName = null;
+
+      myChart.on('mouseover', function (params) {
+        if (!provinceDataMap[params.name]) return;
+        if (isOverBox || currentHoverName === params.name) return;
+        
+        clearTimeout(hideTimer);
+        currentHoverName = params.name;
+        tooltipEl.innerHTML = provinceDataMap[params.name];
+        tooltipEl.style.transform = 'none';
+        tooltipEl.style.bottom = 'auto';
+        tooltipEl.style.display = 'block';
+
+        if (params.event && params.event.event) {
+          const e = params.event.event;
+          let x = e.clientX + 20;
+          let y = e.clientY - 20;
+
+          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
+          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
+          if (y < 10) y = 10;
+
+          tooltipEl.style.left = x + 'px';
+          tooltipEl.style.top = y + 'px';
+        }
+      });
+
+      myChart.on('mouseout', function () {
+        hideTimer = setTimeout(() => {
+          if (!isOverBox) {
+            tooltipEl.style.display = 'none';
+            currentHoverName = null;
+          }
+        }, 300);
+      });
+
+      tooltipEl.addEventListener('mouseenter', () => {
+        isOverBox = true;
+        clearTimeout(hideTimer);
+      });
+
+      tooltipEl.addEventListener('mouseleave', () => {
+        isOverBox = false;
+        tooltipEl.style.display = 'none';
+        currentHoverName = null;
+      });
+    }
+
+    window.addEventListener('resize', () => myChart.resize());
+
+    // 主题切换（深色 / 浅色）时重新上色
+    if (window.HSLTheme && HSLTheme.onChange) {
+      HSLTheme.onChange(function () {
+        setTimeout(function () { renderMap(currentMapId, currentMapId !== null); }, 30);
+      });
+    }
+  </script>
+</body>
+</html>

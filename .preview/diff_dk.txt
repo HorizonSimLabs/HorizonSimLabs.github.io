@@ -1,0 +1,132 @@
+﻿=== 改UI前有、现在没有 (73) ===
+394|     // 丹麦的市镇级行政区划
+395|     const DENMARK_GEOJSON_URLS = [
+396|       '../GeoJSON/Denmark.json'
+397|     ];
+399|     async function loadDenmarkGeoJson() {
+400|       for (const url of DENMARK_GEOJSON_URLS) {
+401|         try {
+402|           const res = await fetch(url);
+403|           if (res.ok) return await res.json();
+404|         } catch (e) { console.warn('丹麦分区数据读取失败，尝试下一个源：', url); }
+405|       }
+406|       throw new Error('丹麦分区地图数据加载失败，请检查 GeoJSON/Denmark.json。');
+407|     }
+408| 
+412|         const realGeoJson = decodeGeoJson(await loadDenmarkGeoJson());
+438|             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+459|                 const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+460| 
+462| myChart.setOption({
+463|           backgroundColor: 'transparent',
+478|         }, true);
+480|       } catch (e) {
+481|         console.error("地图加载失败", e);
+482|         myChart.hideLoading();
+483|         const tipEl = document.getElementById('loading-tip');
+485|         tipEl.style.display = 'inline-flex';
+486|         tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/Denmark.json 是否存在。';
+487|       }
+488|     }
+490|     function updateUI() {
+491|       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+492|       document.getElementById('back-btn').innerText = i18n[currentLang].back;
+493|     }
+495|     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+496|     // 深浅主题切换后重绘地图（配色取自主题变量）
+497|     if (window.HSLTheme && HSLTheme.onChange) {
+498|       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+499|     }
+500|     initApp();
+502|     document.getElementById('lang-btn').addEventListener('click', async () => {
+503|       currentLang = currentLang === 'zh' ? 'en' : 'zh';
+504|       updateUI(); await fetchData(); renderMap();
+505|     });
+507|     if (!isMobile) {
+508|       let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+509|       myChart.on('mouseover', function (params) {
+510|         if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+511|         clearTimeout(hideTimer); currentHoverName = params.name;
+512|         tooltipEl.innerHTML = provinceDataMap[params.name];
+513|         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+514|         if (params.event && params.event.event) {
+521|         }
+522|       });
+523|       myChart.on('mouseout', function () {
+524|         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+525|       });
+526|       tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+527|       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+528|     }
+530|     myChart.on('click', function(params) {
+531|       if (isMobile && provinceDataMap[params.name]) {
+532|         tooltipEl.innerHTML = provinceDataMap[params.name];
+533|         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+534|         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+535|       }
+536|     });
+538|     myChart.getZr().on('click', function (event) {
+539|       if (isMobile && !event.target) tooltipEl.style.display = 'none';
+540|     });
+542|     window.addEventListener('resize', () => myChart.resize());
+543|   </script>
+544| </body>
+545| </html>
+=== 现在有、改UI前没有 (57) ===
+398|         const realGeoJson = await (async () => {
+399|           const res = await fetch(`../GeoJSON/Denmark.json`);
+400|           if (!res.ok) throw new Error('HTTP ' + res.status);
+401|           return await res.json();
+402|         })();
+428|             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+449|         const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+451|         myChart.setOption({
+466|           });
+468|           } catch (e) {
+469|           console.error("地图加载失败", e);
+470|           myChart.hideLoading();
+471|           const tipEl = document.getElementById('loading-tip');
+473|           tipEl.style.display = 'inline-flex';
+474|           tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+475|           }
+476|           }
+478|           function updateUI() {
+479|           document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+480|           document.getElementById('back-btn').innerText = i18n[currentLang].back;
+481|           }
+483|           async function initApp() { updateUI(); await fetchData(); renderMap(); }
+484|           initApp();
+486|           document.getElementById('lang-btn').addEventListener('click', async () => {
+487|           currentLang = currentLang === 'zh' ? 'en' : 'zh';
+488|           updateUI(); await fetchData(); renderMap();
+489|           });
+491|           if (!isMobile) {
+492|           let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+493|           myChart.on('mouseover', function (params) {
+494|           if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+495|           clearTimeout(hideTimer); currentHoverName = params.name;
+496|           tooltipEl.innerHTML = provinceDataMap[params.name];
+497|           tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+498|           if (params.event && params.event.event) {
+505|           }
+506|           });
+507|           myChart.on('mouseout', function () {
+508|           hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+509|           });
+510|           tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+511|           tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+512|           }
+514|           myChart.on('click', function(params) {
+515|           if (isMobile && provinceDataMap[params.name]) {
+516|           tooltipEl.innerHTML = provinceDataMap[params.name];
+517|           tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+518|           tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+519|           }
+520|           });
+522|           myChart.getZr().on('click', function (event) {
+523|           if (isMobile && !event.target) tooltipEl.style.display = 'none';
+524|           });
+526|           window.addEventListener('resize', () => myChart.resize());
+527|           </script>
+528|           </body>
+529|           </html>

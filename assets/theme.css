@@ -1,0 +1,345 @@
+/* ==========================================================================
+   HorizonSimLabs — 设计系统
+   深色为主 + 自动跟随系统浅色；可在 <head> 里放 <link rel="stylesheet" href="assets/theme.css">
+   （配合 assets/theme.js 提供三态主题切换：跟随系统 / 深色 / 浅色）
+   ========================================================================== */
+
+/* ---------- 1. 设计令牌 ---------- */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-1: #05070f;
+  --bg-2: #0a1120;
+  --bg-3: #0e1730;
+
+  --panel: rgba(21, 31, 51, .58);
+  --panel-hover: rgba(29, 42, 68, .78);
+  --panel-solid: #101a2c;
+  --panel-sunken: rgba(8, 14, 26, .55);
+
+  --line: rgba(148, 178, 230, .13);
+  --line-strong: rgba(148, 178, 230, .30);
+
+  --text: #e9effb;
+  --text-dim: #9fb0cc;
+  --text-mute: #6f819f;
+
+  --brand: #4d8dff;
+  --brand-2: #8b7cff;
+  --cyan: #34d3e6;
+  --green: #35d07f;
+  --amber: #f0b429;
+  --red: #ff6b81;
+
+  --grad-brand: linear-gradient(120deg, #4d8dff 0%, #7b6cff 50%, #a855f7 100%);
+  --grad-accent: linear-gradient(120deg, #2ee6b0 0%, #37b7ff 100%);
+  --grad-text: linear-gradient(95deg, #7cc4ff 0%, #a9b6ff 48%, #d8b4fe 100%);
+  --sheen: linear-gradient(150deg, rgba(255,255,255,.16), rgba(255,255,255,0) 40%);
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.40);
+  --shadow-sm: 0 4px 14px rgba(0,0,0,.42);
+  --shadow-md: 0 14px 34px rgba(0,0,0,.50);
+  --shadow-lg: 0 28px 70px rgba(0,0,0,.58);
+  --glow: 0 10px 30px rgba(80,130,255,.38);
+  --glow-green: 0 10px 30px rgba(46,200,140,.32);
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 22px;
+  --r-xl: 30px;
+
+  --ease: cubic-bezier(.2,.9,.25,1);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-1: #f4f7fd;
+  --bg-2: #eef2fb;
+  --bg-3: #e6ecf8;
+
+  --panel: rgba(255, 255, 255, .78);
+  --panel-hover: #ffffff;
+  --panel-solid: #ffffff;
+  --panel-sunken: rgba(238, 243, 252, .9);
+
+  --line: rgba(30, 64, 120, .12);
+  --line-strong: rgba(30, 64, 120, .26);
+
+  --text: #0e1b2e;
+  --text-dim: #47597a;
+  --text-mute: #7b8aa3;
+
+  --brand: #2563eb;
+  --brand-2: #6d5ef2;
+  --cyan: #0891b2;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red: #dc2626;
+
+  --grad-brand: linear-gradient(120deg, #3b82f6 0%, #635bff 50%, #9333ea 100%);
+  --grad-accent: linear-gradient(120deg, #10b981 0%, #0ea5e9 100%);
+  --grad-text: linear-gradient(95deg, #1d4ed8 0%, #4f46e5 50%, #7c3aed 100%);
+  --sheen: linear-gradient(150deg, rgba(255,255,255,.95), rgba(255,255,255,0) 44%);
+
+  --shadow-xs: 0 1px 2px rgba(15,30,51,.06);
+  --shadow-sm: 0 4px 14px rgba(15,30,51,.08);
+  --shadow-md: 0 14px 34px rgba(15,30,51,.12);
+  --shadow-lg: 0 28px 70px rgba(15,30,51,.16);
+  --glow: 0 10px 28px rgba(59,130,246,.28);
+  --glow-green: 0 10px 28px rgba(22,163,74,.24);
+
+  /* 地图配色 */
+  --map-area: #dbe5f6;
+  --map-border: #b7c6de;
+  --map-label: #3a4a63;
+  --map-lit: #22a95c;
+  --map-lit-edge: #6dd08f;
+  --map-hover: #cbd9ef;
+}
+
+/* ---------- 2. 基础 ---------- */
+* { -webkit-tap-highlight-color: transparent; }
+
+body.hsl-page {
+  background-color: var(--bg-1);
+  background-image:
+    radial-gradient(1200px 640px at 8% -10%, rgba(77, 141, 255, .20), transparent 60%),
+    radial-gradient(900px 520px at 96% 2%, rgba(139, 92, 246, .18), transparent 58%),
+    radial-gradient(800px 480px at 50% 112%, rgba(52, 211, 230, .12), transparent 60%),
+    linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: color .25s ease, background-color .25s ease;
+}
+:root[data-theme="light"] body.hsl-page {
+  background-image:
+    radial-gradient(1200px 640px at 8% -10%, rgba(59, 130, 246, .18), transparent 62%),
+    radial-gradient(900px 520px at 96% 2%, rgba(124, 58, 237, .13), transparent 58%),
+    radial-gradient(800px 480px at 50% 112%, rgba(14, 165, 233, .12), transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+}
+
+/* 全站统一的字体栈：优先中文字体，避免中文回退成宋体 */
+body.hsl-page,
+body.hsl-page button,
+body.hsl-page input,
+body.hsl-page select,
+body.hsl-page textarea {
+  font-family: "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei",
+               "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+}
+
+/* 顶部渐变细线 */
+.hsl-topline {
+  position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 10002; pointer-events: none;
+  background: var(--grad-brand);
+  box-shadow: 0 0 24px rgba(110, 120, 255, .65);
+}
+
+/* ---------- 3. 品牌 ---------- */
+.hsl-brand { display: inline-flex; align-items: center; gap: 13px; text-decoration: none; color: inherit; min-width: 0; }
+.hsl-brand img {
+  width: 46px; height: 46px; border-radius: 50%; flex: 0 0 auto;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--line-strong), 0 8px 22px rgba(37, 99, 235, .35);
+  transition: transform .5s var(--ease), box-shadow .3s ease;
+}
+.hsl-brand:hover img { transform: rotate(-7deg) scale(1.07); box-shadow: 0 0 0 1px var(--line-strong), 0 12px 30px rgba(99, 102, 241, .5); }
+.hsl-brand-txt { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.hsl-brand-name {
+  font-size: 1rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase;
+  background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent;
+  white-space: nowrap;
+}
+.hsl-brand-sub { font-size: .7rem; letter-spacing: .26em; text-transform: uppercase; color: var(--text-mute); }
+
+/* ---------- 4. 按钮 ---------- */
+.hsl-btn {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px 20px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); cursor: pointer; text-decoration: none;
+  font-size: .92rem; font-weight: 600; white-space: nowrap; overflow: hidden; isolation: isolate;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(16px) saturate(140%); -webkit-backdrop-filter: blur(16px) saturate(140%);
+  transition: transform .24s var(--ease), box-shadow .26s ease, border-color .26s ease,
+              background .26s ease, color .2s ease;
+}
+.hsl-btn::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; background: var(--sheen);
+  opacity: .85; transition: opacity .3s ease; pointer-events: none;
+}
+.hsl-btn:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+.hsl-btn:active { transform: translateY(0) scale(.98); }
+.hsl-btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+.hsl-btn--primary { background: var(--grad-brand); border-color: transparent; color: #fff; box-shadow: var(--glow); }
+.hsl-btn--primary::after { background: linear-gradient(120deg, rgba(255,255,255,.34), rgba(255,255,255,0) 46%); }
+.hsl-btn--primary:hover { box-shadow: 0 16px 42px rgba(110, 100, 255, .50); }
+
+.hsl-btn--accent { background: var(--grad-accent); border-color: transparent; color: #04221a; box-shadow: var(--glow-green); font-weight: 800; }
+.hsl-btn--ghost { background: transparent; }
+.hsl-btn--ghost:hover { background: var(--panel); }
+.hsl-btn[disabled], .hsl-btn--disabled {
+  background: var(--panel-sunken) !important; color: var(--text-mute) !important;
+  border-color: var(--line) !important; cursor: not-allowed; box-shadow: none !important;
+  transform: none !important;
+}
+
+/* 浮动胶囊（地图页顶部返回 / 语言切换） */
+.hsl-chip {
+  position: fixed; top: 16px; z-index: 9999;
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 17px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text); text-decoration: none; cursor: pointer;
+  font-size: .88rem; font-weight: 600; font-family: inherit;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+  transition: transform .24s var(--ease), box-shadow .26s ease, border-color .26s ease, background .26s ease;
+}
+.hsl-chip:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
+.hsl-chip:active { transform: translateY(0) scale(.97); }
+.hsl-chip--accent { background: var(--grad-accent); border-color: transparent; color: #04221a; box-shadow: var(--glow-green); font-weight: 800; }
+.hsl-chip--accent:hover { box-shadow: 0 16px 36px rgba(46, 200, 140, .45); }
+
+/* ---------- 5. 卡片 ---------- */
+.hsl-card {
+  position: relative; border-radius: var(--r-md); border: 1px solid var(--line);
+  background: var(--panel); box-shadow: var(--shadow-sm); overflow: hidden;
+  backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+  transition: transform .3s var(--ease), box-shadow .3s ease, border-color .3s ease, background .3s ease;
+}
+.hsl-card--hover:hover { transform: translateY(-6px); border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
+
+/* 渐变描边（hover 时从角落亮起） */
+.hsl-ring { position: relative; }
+.hsl-ring::before {
+  content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px;
+  background: var(--grad-brand); opacity: 0; transition: opacity .34s ease;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+}
+.hsl-ring:hover::before { opacity: .9; }
+
+/* ---------- 6. 标签 / 徽章 ---------- */
+.hsl-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px; border-radius: 999px;
+  font-size: .74rem; font-weight: 700; letter-spacing: .04em;
+  color: var(--text-dim); background: var(--panel-sunken);
+  border: 1px solid var(--line);
+}
+.hsl-tag--brand { color: #fff; background: var(--grad-brand); border-color: transparent; }
+.hsl-tag--live { color: var(--green); border-color: currentColor; background: transparent; }
+.hsl-tag--dot::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 0 currentColor; animation: hsl-pulse 2.4s ease-out infinite;
+}
+
+/* ---------- 7. 搜索框 ---------- */
+.hsl-search {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; border-radius: 999px;
+  background: var(--panel-sunken); border: 1px solid var(--line);
+  transition: border-color .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.hsl-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(77, 141, 255, .16); background: var(--panel); }
+.hsl-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent;
+  color: var(--text); font-size: .92rem; font-family: inherit;
+}
+.hsl-search input::placeholder { color: var(--text-mute); }
+.hsl-search .hsl-search-icon { color: var(--text-mute); font-size: .95rem; flex: 0 0 auto; }
+
+/* ---------- 8. 弹窗 / 遮罩 ---------- */
+.hsl-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(4, 8, 18, .72); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: hsl-fadein .25s ease;
+}
+:root[data-theme="light"] .hsl-overlay { background: rgba(15, 30, 51, .38); }
+.hsl-overlay.is-open { display: flex; }
+
+.hsl-modal {
+  position: relative; width: min(760px, 94vw); max-height: 86vh;
+  display: flex; flex-direction: column;
+  border-radius: var(--r-lg); border: 1px solid var(--line-strong);
+  background: var(--panel-solid); box-shadow: var(--shadow-lg);
+  animation: hsl-pop .34s var(--ease);
+}
+.hsl-modal-head { display: flex; align-items: flex-start; gap: 14px; padding: 22px 24px 14px; }
+.hsl-modal-title { flex: 1; font-size: 1.24rem; font-weight: 800; line-height: 1.35; word-break: break-word; }
+.hsl-modal-body { padding: 0 24px 22px; overflow-y: auto; }
+.hsl-modal-close {
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-sunken); color: var(--text-dim);
+  font-size: 1.05rem; line-height: 1; font-family: inherit;
+  transition: background .2s, color .2s, transform .2s;
+}
+.hsl-modal-close:hover { color: var(--text); background: var(--panel-hover); transform: rotate(90deg); }
+
+/* ---------- 9. 骨架屏 / 滚动条 ---------- */
+.hsl-skeleton {
+  background: linear-gradient(90deg, rgba(140,170,220,.10) 25%, rgba(140,170,220,.24) 37%, rgba(140,170,220,.10) 63%);
+  background-size: 400% 100%; animation: hsl-shimmer 1.4s ease infinite; border-radius: 8px;
+}
+
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  border-radius: 999px; border: 2px solid transparent; background-clip: padding-box;
+  background-color: rgba(120, 160, 240, .38);
+}
+::-webkit-scrollbar-thumb:hover { background-color: rgba(120, 160, 240, .70); }
+
+/* ---------- 10. 动效 ---------- */
+@keyframes hsl-fadein { from { opacity: 0 } to { opacity: 1 } }
+@keyframes hsl-pop { from { opacity: 0; transform: translateY(16px) scale(.97) } to { opacity: 1; transform: none } }
+@keyframes hsl-rise { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: none } }
+@keyframes hsl-shimmer { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+@keyframes hsl-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes hsl-float { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-9px) } }
+
+.hsl-rise { animation: hsl-rise .68s var(--ease) both; }
+.hsl-d1 { animation-delay: .08s } .hsl-d2 { animation-delay: .16s }
+.hsl-d3 { animation-delay: .24s } .hsl-d4 { animation-delay: .32s }
+.hsl-d5 { animation-delay: .40s } .hsl-d6 { animation-delay: .48s }
+
+@media (prefers-reduced-motion: reduce) {
+  .hsl-rise, .hsl-skeleton, .hsl-modal, .hsl-overlay { animation: none !important; }
+  *, *::before, *::after { transition-duration: .01ms !important; }
+}
+
+/* ---------- 11. 主题切换按钮 ---------- */
+.hsl-theme-toggle {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  box-shadow: var(--shadow-sm); font-size: 1rem; line-height: 1; font-family: inherit;
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  transition: transform .32s var(--ease), border-color .25s ease, box-shadow .25s ease;
+}
+.hsl-theme-toggle:hover { transform: rotate(-16deg) scale(1.08); border-color: var(--line-strong); box-shadow: var(--shadow-md); }
+.hsl-theme-toggle:active { transform: scale(.93); }
+.hsl-theme-toggle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+.hsl-theme-float { position: fixed; top: 16px; right: 16px; z-index: 10001; }
+
+/* ---------- 12. 通用工具 ---------- */
+.hsl-grad-text {
+  background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hsl-muted { color: var(--text-mute); }
+.hsl-empty {
+  grid-column: 1 / -1; text-align: center; padding: 64px 20px;
+  color: var(--text-mute); font-size: 1rem;
+}
+.hsl-hide { display: none !important; }

@@ -1,0 +1,132 @@
+﻿=== 改UI前有、现在没有 (73) ===
+266|     // 不丹的 20 个宗
+267|     const BHUTAN_GEOJSON_URLS = [
+268|       '../GeoJSON/Bhutan.json'
+269|     ];
+271|     async function loadBhutanGeoJson() {
+272|       for (const url of BHUTAN_GEOJSON_URLS) {
+273|         try {
+274|           const res = await fetch(url);
+275|           if (res.ok) return await res.json();
+276|         } catch (e) { console.warn('不丹分区数据读取失败，尝试下一个源：', url); }
+277|       }
+278|       throw new Error('不丹分区地图数据加载失败，请检查 GeoJSON/Bhutan.json。');
+279|     }
+280| 
+284|         const realGeoJson = await loadBhutanGeoJson();
+298|             mapData.push({ name: featureName, itemStyle: HSLGeo.areaStyle('lit') });
+308|                 const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+309| 
+311| myChart.setOption({
+312|           backgroundColor: 'transparent',
+327|         }, true);
+329|       } catch (e) {
+330|         console.error("地图加载失败", e);
+331|         myChart.hideLoading();
+332|         const tipEl = document.getElementById('loading-tip');
+334|         tipEl.style.display = 'inline-flex';
+335|         tipEl.innerHTML = '地图数据加载失败，请检查 GeoJSON/Bhutan.json 是否存在。';
+336|       }
+337|     }
+339|     function updateUI() {
+340|       document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+341|       document.getElementById('back-btn').innerText = i18n[currentLang].back;
+342|     }
+344|     async function initApp() { updateUI(); await fetchData(); renderMap(); }
+345|     // 深浅主题切换后重绘地图（配色取自主题变量）
+346|     if (window.HSLTheme && HSLTheme.onChange) {
+347|       HSLTheme.onChange(() => setTimeout(() => { if (myChart) renderMap(); }, 30));
+348|     }
+349|     initApp();
+351|     document.getElementById('lang-btn').addEventListener('click', async () => {
+352|       currentLang = currentLang === 'zh' ? 'en' : 'zh';
+353|       updateUI(); await fetchData(); renderMap();
+354|     });
+356|     if (!isMobile) {
+357|       let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+358|       myChart.on('mouseover', function (params) {
+359|         if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+360|         clearTimeout(hideTimer); currentHoverName = params.name;
+361|         tooltipEl.innerHTML = provinceDataMap[params.name];
+362|         tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+363|         if (params.event && params.event.event) {
+370|         }
+371|       });
+372|       myChart.on('mouseout', function () {
+373|         hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+374|       });
+375|       tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+376|       tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+377|     }
+379|     myChart.on('click', function(params) {
+380|       if (isMobile && provinceDataMap[params.name]) {
+381|         tooltipEl.innerHTML = provinceDataMap[params.name];
+382|         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+383|         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+384|       }
+385|     });
+387|     myChart.getZr().on('click', function (event) {
+388|       if (isMobile && !event.target) tooltipEl.style.display = 'none';
+389|     });
+391|     window.addEventListener('resize', () => myChart.resize());
+392|   </script>
+393| </body>
+394| </html>
+=== 现在有、改UI前没有 (57) ===
+270|         const realGeoJson = await (async () => {
+271|           const res = await fetch(`../GeoJSON/Bhutan.json`);
+272|           if (!res.ok) throw new Error('HTTP ' + res.status);
+273|           return await res.json();
+274|         })();
+288|             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+298|         const style = mapSeriesStyle({ labelShow: true, fontSize: isMobile ? 8 : 10 });
+300|         myChart.setOption({
+315|           });
+317|           } catch (e) {
+318|           console.error("地图加载失败", e);
+319|           myChart.hideLoading();
+320|           const tipEl = document.getElementById('loading-tip');
+322|           tipEl.style.display = 'inline-flex';
+323|           tipEl.innerHTML = '地图数据加载失败，请检查网络或数据源。';
+324|           }
+325|           }
+327|           function updateUI() {
+328|           document.getElementById('lang-btn').innerText = i18n[currentLang].langBtn;
+329|           document.getElementById('back-btn').innerText = i18n[currentLang].back;
+330|           }
+332|           async function initApp() { updateUI(); await fetchData(); renderMap(); }
+333|           initApp();
+335|           document.getElementById('lang-btn').addEventListener('click', async () => {
+336|           currentLang = currentLang === 'zh' ? 'en' : 'zh';
+337|           updateUI(); await fetchData(); renderMap();
+338|           });
+340|           if (!isMobile) {
+341|           let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+342|           myChart.on('mouseover', function (params) {
+343|           if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
+344|           clearTimeout(hideTimer); currentHoverName = params.name;
+345|           tooltipEl.innerHTML = provinceDataMap[params.name];
+346|           tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+347|           if (params.event && params.event.event) {
+354|           }
+355|           });
+356|           myChart.on('mouseout', function () {
+357|           hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+358|           });
+359|           tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
+360|           tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+361|           }
+363|           myChart.on('click', function(params) {
+364|           if (isMobile && provinceDataMap[params.name]) {
+365|           tooltipEl.innerHTML = provinceDataMap[params.name];
+366|           tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
+367|           tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
+368|           }
+369|           });
+371|           myChart.getZr().on('click', function (event) {
+372|           if (isMobile && !event.target) tooltipEl.style.display = 'none';
+373|           });
+375|           window.addEventListener('resize', () => myChart.resize());
+376|           </script>
+377|           </body>
+378|           </html>
