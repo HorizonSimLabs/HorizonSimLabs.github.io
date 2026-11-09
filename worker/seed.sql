@@ -1,0 +1,84 @@
+-- HorizonSimLabs 地景数据：D1 scenery 表初始化 + 导入
+-- 用法：npx wrangler d1 execute <数据库名> --remote --file=./worker/seed.sql
+
+CREATE TABLE IF NOT EXISTS scenery (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  rawProvince TEXT NOT NULL,
+  author      TEXT,
+  freeLink    TEXT,
+  freeLevel   TEXT,
+  paidLink    TEXT,
+  paidLevel   TEXT,
+  remark      TEXT,
+  created_at  TEXT DEFAULT (datetime('now'))
+);
+
+DELETE FROM scenery;
+
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('台湾', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', 'https://ifdian.net/item/9763f0ea930311f0a44052540025c377', '16', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('贵州', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '这个是全贵州，点进去贵阳和遵义能升级|This is for all of Guizhou. Click in and you can upgrade Guiyang and Zunyi.');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('贵阳', '一个塑料瓶', 'https://ifdian.net/p/84992468a53511f1bb0252540025c377', '16', 'https://ifdian.net/item/f687b198a53511f1b9515254001e7c00', '17', 'The free version is free for Supporter');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('遵义', '一个塑料瓶', '无|None', '无|None', 'https://ifdian.net/item/e212a45cadd211f1a4c75254001e7c00', '16/17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('山西', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15~16', 'https://ifdian.net/item/4485dbda930411f08bce5254001e7c00', '16~17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('承德', '一个塑料瓶', 'https://ifdian.net/p/4915b68ca35411f1a8685254001e7c00', '16', '无|None', '无|None', '对所有发电者免费|Free for Supporter');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('广西', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', 'https://ifdian.net/item/30abe1068fdd11f0b97952540025c377', '16', '插件名称为华南|Its name is South China plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('兰州', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '16', 'https://ifdian.net/item/6d1567e8c0c911f1bc1d52540025c377', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('酒泉', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '属甘肃-河西走廊插件|Belongs to Gansu Hexi Corridor plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('嘉峪关', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '属甘肃-河西走廊插件|Belongs to Gansu Hexi Corridor plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('张掖', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '属甘肃-河西走廊插件|Belongs to Gansu Hexi Corridor plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('金昌', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '属甘肃-河西走廊插件|Belongs to Gansu Hexi Corridor plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('武威', '一个塑料瓶', 'https://url13.ctfile.com/d/66483413-168737692-6d7de7?p=D8g7Nj1w', '15', '无|None', '无|None', '属甘肃-河西走廊插件|Belongs to Gansu Hexi Corridor plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('上海', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('宣城', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('芜湖', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('马鞍山', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('黄山', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('常州', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('无锡', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('苏州', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('杭州', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('绍兴', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('宁波', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('湖州', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('嘉兴', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/MZudjLP', '16~18', '属华东插件，AF4/AFG|Belongs to the East China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('北京', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/44tamqv', '16~18', '属华北插件，AF4/AFG|Belongs to the North China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('天津', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/44tamqv', '16~18', '属华北插件，AF4/AFG|Belongs to the North China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('廊坊', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/44tamqv', '16~18', '属华北插件，AF4/AFG|Belongs to the North China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('保定', 'Orange-dog', '无|None', '无|None', 'https://b23.tv/44tamqv', '16~18', '属华北插件，AF4/AFG|Belongs to the North China plugin,both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('恩施', '南航首架A320', 'https://pan.quark.cn/s/20cd52229953', '15', 'https://ifdian.net/item/9cfcaf90bfd211f1b28c5254001e7c00', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('湖州', '南航首架A320', '无|None', '无|None', 'https://ifdian.net/item/2886667ac9fe11f19b2952540025c377', '16', '与杭州捆绑售卖|Bundled sale with Hangzhou');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('洛阳', '南航首架A320', '无|None', '无|None', 'https://ifdian.net/item/48b6876cbe3411f0b53f52540025c377', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('比隆', '南航首架A320', '未完待续|To be countinued', '未完待续|To be countinued', 'https://afdian.com/item/5ea5b288c3be11f1940652540025c377', '17', '目前只有比隆，未完待续|Currently only Billund in Halsnaes, to be continued');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('哥本哈根', '南航首架A320', '无|None', '无|None', 'https://ifdian.net/item/2a52e2e2d44111f1b4c15254001e7c00', '16', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('林芝', '飞鱼', 'https://1837563108.share.123pan.cn/123pan/8A4MTd-JCyAH?pwd=46Pv', '15', '无|None', '无|None', '仅限AF4|Only for AF4');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('首尔', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/e3f4c23096c411f09a0352540025c377', '16~18', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('名古屋', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/d8708aa209b511f1bfbd52540025c377', '16~17', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('重庆', '飞鱼', 'https://ifdian.net/p/40b517269b4911f0addd5254001e7c00', '15', 'https://ifdian.net/item/e0a545e009a711f1b48152540025c377', '15~18', '付费版支持双端，免费只有AFG|The Paid Version is for both AF4 and AFG,the Free Verison is only for AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('郑州', '飞鱼', 'https://ifdian.net/p/82a8f9c0b27a11f0aea852540025c377', '16', '无|None', '无|None', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('辽宁', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/a76ac602029911f1a58452540025c377', '14~16', 'AF4/AFG，点进去大连和沈阳能升级|Both for AF4 and AFG,Click in and you can upgrade Dalian and Shenyang');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('石家庄', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/cb197c94000811f19f6c5254001e7c00', '16~17', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('大阪', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/a9151a84e88b11f0a26b52540025c377', '16~19', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('大连', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/dee18de0e30f11f080be52540025c377', '17', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('伊斯坦布尔', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/7d68cfb2b25211f0b8f752540025c377', '16~19', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('沈阳', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/6539b1aeacd511f0a1c952540025c377', '16~17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('悉尼', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/faaea0baa24d11f089cf5254001e7c00', '16~17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('冰岛', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/f623b6fca35b11f09e965254001e7c00', '15~18', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('福州', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/c2213e54a1c311f099ac5254001e7c00', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('武汉', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/dbd9caec9eca11f0b41252540025c377', '16', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('海南', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/4a2ee88c915711f09eb052540025c377', '16~17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('吉隆坡', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/84505934a0c411f08a1152540025c377', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('槟城', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/384f6f6e915811f0b83152540025c377', '17', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('皇后镇', '飞鱼', '无|None', '无|None', 'https://ifdian.net/item/828c44b6915411f089cb52540025c377', '16~17', 'AF4/AFG|Both for AF4 and AFG');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('平壤', 'Serein.', '无|None', '无|None', 'https://ifdian.net/item/dbc6cfc283f011f095f252540025c377', '18', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('东京', 'Serein.', '无|None', '无|None', 'https://ifdian.net/item/024f37929f3011f0ac1752540025c377', '19', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('帕罗', 'Serein.', '无|None', '无|None', 'https://ifdian.net/item/0b926bbea32a11f08c0f52540025c377', '17~19', '无|None');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('九江', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/f9343b28a29811f096fe5254001e7c00', '16', '属江西插件|Belongs to Jiangxi plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('南昌', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/f9343b28a29811f096fe5254001e7c00', '16', '属江西插件|Belongs to Jiangxi plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('抚州', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/f9343b28a29811f096fe5254001e7c00', '16', '属江西插件|Belongs to Jiangxi plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('景德镇', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/f9343b28a29811f096fe5254001e7c00', '16', '属江西插件|Belongs to Jiangxi plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('岳阳', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/872d2ff69a1b11f08ab05254001e7c00', '16', '属湖南插件|Belongs to Hunan plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('长沙', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/872d2ff69a1b11f08ab05254001e7c00', '16', '属湖南插件|Belongs to Hunan plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('衡阳', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/872d2ff69a1b11f08ab05254001e7c00', '16', '属湖南插件|Belongs to Hunan plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('常德', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/872d2ff69a1b11f08ab05254001e7c00', '16', '属湖南插件|Belongs to Hunan plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('邵阳', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/872d2ff69a1b11f08ab05254001e7c00', '16', '属湖南插件|Belongs to Hunan plugin');
+INSERT INTO scenery (rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) VALUES ('新加坡', '云的三相图', '无|None', '无|None', 'https://ifdian.net/item/a5a75dd6a28511f0b8f752540025c377', '16', '无|None');

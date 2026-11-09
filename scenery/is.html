@@ -38,6 +38,30 @@
     .info-label { font-weight: bold; color: #64748b; margin-right: 10px; }
     .my-link { color: #3b82f6; text-decoration: none; font-weight: bold; }
     .my-link:hover { text-decoration: underline; }
+
+    /* ★ 冰岛走的是点击弹窗，不给地图开 tooltip（tooltip.show 为 true 时会在绿色冰岛上
+       叠一个黑底小气泡，把国家名盖住） */
+    html, body { background: #f5f7fa; }
+    #loading-tip { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 50; display: none;
+      padding: 10px 18px; border-radius: 999px; border: 1px solid #dbe3ee; background: #ffffff;
+      color: #64748b; font-size: 14px; box-shadow: 0 8px 24px rgba(15,23,42,.10); }
+    #back-btn, #lang-btn {
+      position: fixed; top: 15px; z-index: 10000; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+      font-size: 14px; text-decoration: none; color: #fff; font-family: inherit;
+      background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255,255,255,0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    #back-btn { left: 15px; }
+    #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
+
+    /* 同一地点多个插件：多条时用「第几条 / 共几条」+ 虚线分隔 */
+    #panel-body { max-height: 62vh; overflow-y: auto; padding-right: 4px; }
+    .detail-item { position: relative; }
+    .detail-item--sep { margin-top: 18px; padding-top: 16px; border-top: 1px dashed #cbd5e1; }
+    .detail-index {
+      display: inline-block; margin-bottom: 8px; padding: 1px 8px; border-radius: 999px;
+      font-size: .7rem; font-weight: bold; color: #64748b; background: #f1f5f9; border: 1px solid #e2e8f0;
+    }
     
     .close-btn {
       position: absolute; top: 15px; right: 20px;
@@ -57,6 +81,22 @@
     #lang-btn:hover { background: #059669; }
     
     #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
+
+    /* 悬停信息卡片（自带样式，不依赖外部 CSS） */
+    #my-tooltip {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 99999; display: none;
+      width: min(360px, calc(100vw - 32px)); max-height: min(72vh, 560px); overflow-y: auto;
+      padding: 14px 16px; background: #fff; color: #1b2436; border: 1px solid #cfd8e6;
+      border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+      font-size: 14px; line-height: 1.7; white-space: normal;
+    }
+    #my-tooltip .info-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+    #my-tooltip .info-label { color: #64748b; }
+    #my-tooltip .my-link {
+      display: inline-block; padding: 1px 10px; border-radius: 999px; text-decoration: none;
+      color: #fff; background: linear-gradient(120deg, #4d8dff, #7b6cff); font-size: 13px;
+    }
+    #my-tooltip .my-link:hover { background: #2458b8; }
   </style>
 </head>
 <body>
@@ -65,6 +105,7 @@
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   
   <div id="map"></div>
+  <div id="my-tooltip"></div>
 
   <!-- 详情面板 -->
   <div id="detail-panel">
@@ -76,7 +117,12 @@
   </div>
 
   <script>
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    // ★ 之前用 'ontouchstart' in window 判定手机，触屏笔记本/二合一平板会被误判成手机，
+    //   于是根本不注册 mouseover —— 鼠标放上去什么都不显示。现在只按 UA 判定。
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // 鼠标当前位置（给悬停卡片定位兜底用）
+    const lastPointer = { x: 200, y: 200 };
+    window.addEventListener('mousemove', function (e) { lastPointer.x = e.clientX; lastPointer.y = e.clientY; }, { passive: true });
     let currentLang = 'zh';
 
     const i18n = {
@@ -92,8 +138,7 @@
     }
 
     function buildDetailHtml(author, freeLink, freeLevel, paidLink, paidLevel, remark) {
-      const t = i18n[currentLang];
-      const displayAuthor = parseBilingual(author);
+      const t = i18n[currentLang];      const displayAuthor = parseBilingual(author);
       const displayFreeLevel = parseBilingual(freeLevel);
       const displayPaidLevel = parseBilingual(paidLevel);
       const displayRemark = parseBilingual(remark);
@@ -120,10 +165,25 @@
       return html;
     }
 
+    // ★ 冰岛可能有好几个作者做的插件：单条时原样显示，多条时全部列出并加「第几条 / 共几条」
+    function renderIcelandDetail(items) {
+      if (!items || !items.length) return '';
+      const cards = items.map(function (it) {
+        return buildDetailHtml(it.author, it.freeLink, it.freeLevel, it.paidLink, it.paidLevel, it.remark);
+      });
+      if (cards.length === 1) return cards[0];
+      return items.map(function (it, idx) {
+        return '<div class="detail-item' + (idx ? ' detail-item--sep' : '') + '">'
+          + '<span class="detail-index">' + (idx + 1) + '/' + items.length + '</span>'
+          + cards[idx] + '</div>';
+      }).join('');
+    }
+
     function openDetail(dataObj) {
       document.getElementById('panel-title').innerText = currentLang === 'zh' ? '冰岛地景' : 'Iceland Scenery';
       if (dataObj) {
-        document.getElementById('panel-body').innerHTML = buildDetailHtml(dataObj.author, dataObj.freeLink, dataObj.freeLevel, dataObj.paidLink, dataObj.paidLevel, dataObj.remark);
+        const list = Array.isArray(dataObj) ? dataObj : [dataObj];
+        document.getElementById('panel-body').innerHTML = renderIcelandDetail(list);
       } else {
         document.getElementById('panel-body').innerHTML = `<div class="info-row" style="color:#ef4444;">${currentLang === 'zh' ? '暂无该地景的数据，请在 done.json 中添加 "冰岛"。' : 'No data found. Please add "冰岛" to done.json.'}</div>`;
       }
@@ -135,7 +195,39 @@
     }
 
     const myChart = echarts.init(document.getElementById('map'));
-    let icelandData = null;
+    let icelandData = [];
+
+
+
+    // ==================== 地景数据：Cloudflare D1 接口 ====================
+    // 数据源已从静态文件 done.json 换成 D1（Cloudflare Worker + D1 scenery 表）。
+    // 接口返回 { ok: true, count, data: [{ rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark }] }
+    // 出错时自动回落到站点根目录的 done.json，保证页面不会白板。
+    const LANDSCAPES_API = 'https://horizonsimlabs-api.seeout360.workers.dev/api/landscapes';
+
+    // 接口成功 → 返回对象；回落 done.json → 返回原始文本（parseDoneJson 两种都认）
+    async function landscapeSource(res) {
+      if (res && res.data && Array.isArray(res.data)) return res;
+      if (res && typeof res.raw === 'string') return res.raw;
+      if (res && typeof res.text === 'function') return await res.text();
+      return res;
+    }
+
+    async function fetchLandscapes() {
+      try {
+        const res = await fetch(LANDSCAPES_API + (LANDSCAPES_API.indexOf('?') < 0 ? '?t=' : '&t=') + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data || data.ok === false || !Array.isArray(data.data)) throw new Error('接口返回格式不正确');
+        console.info('[地景数据] 来自 D1 接口：' + data.data.length + ' 条');
+        return data;
+      } catch (e) {
+        console.warn('D1 接口不可用，回落到 ../done.json', e);
+        const res = await fetch('../done.json?t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return { ok: true, count: -1, data: null, raw: await res.text() };
+      }
+    }
 
     // ==================== done.json 解析 ====================
     // ★ 必须按「行」解析。
@@ -146,6 +238,23 @@
     function parseDoneJson(rawText) {
       const result = [];
       if (!rawText) return result;
+
+      // ★ D1 接口返回的是 { ok, count, data: [...] } 这样的对象，直接把每条记录映射成同样结构
+      if (typeof rawText === 'object') {
+        const list = Array.isArray(rawText) ? rawText : (Array.isArray(rawText.data) ? rawText.data : []);
+        list.forEach(item => {
+          const rawProvince = String(item.rawProvince || '').trim();
+          if (!rawProvince) return;
+          result.push({
+            rawProvince: rawProvince,
+            author: item.author || i18n[currentLang].unknown,
+            freeLink: item.freeLink || '', freeLevel: item.freeLevel || '',
+            paidLink: item.paidLink || '', paidLevel: item.paidLevel || '',
+            remark: item.remark || ''
+          });
+        });
+        return result;
+      }
 
       const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
 
@@ -180,17 +289,18 @@
     }
 
     async function fetchData() {
+      icelandData = [];
       try {
-        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        const doneRes = await fetchLandscapes();
         if (doneRes.ok) {
           // ★ 按行解析，避免备注里的英文逗号把条目切断
-          const entries = parseDoneJson(await doneRes.text());
+          const entries = parseDoneJson(await landscapeSource(doneRes));
           entries.forEach(entry => {
             const rawProvince = entry.rawProvince;
 
             // 识别冰岛相关的名字
             if (rawProvince.includes('冰岛') || rawProvince.includes('雷克雅未克') || rawProvince.toLowerCase().includes('iceland') || rawProvince.toLowerCase().includes('reykjavik')) {
-              icelandData = {
+              icelandData.push({
                 rawProvince: rawProvince,
                 author: entry.author,
                 freeLink: entry.freeLink,
@@ -198,7 +308,7 @@
                 paidLink: entry.paidLink,
                 paidLevel: entry.paidLevel,
                 remark: entry.remark
-              };
+              });
             }
           });
         }
@@ -260,12 +370,7 @@
 
         myChart.setOption({
           tooltip: {
-            show: true,
-            trigger: 'item',
-            formatter: function () {
-              if (isCompleted) return currentLang === 'zh' ? '点击查看冰岛地景' : 'Click to view Iceland Scenery';
-              return currentLang === 'zh' ? '暂无地景' : 'No Scenery';
-            }
+            show: false
           },
           series: [{
             type: 'map',
@@ -321,6 +426,92 @@
 
     myChart.on('click', function() {
       openDetail(icelandData);
+    });
+
+    // ★ 鼠标移到绿色区域就出信息卡片（和其他国家页一致），不再必须点击
+    //   卡片跟着鼠标走，并且鼠标还在上面时不会自动消失
+    const tooltipEl = document.getElementById('my-tooltip');
+    let hideTimer = null;
+    let isOverBox = false;
+
+    // 卡片显示在「当前鼠标悬停的区块」旁边
+    let hoverAnchor = null;
+    function rememberMouse(x, y) {
+      if (!isFinite(x) || !isFinite(y)) return;
+      hoverAnchor = { x: x, y: y };
+    }
+    function placeTooltipAt() {
+      let cx = null, cy = null;
+      if (hoverAnchor) { cx = hoverAnchor.x; cy = hoverAnchor.y; }
+      if (cx === null && lastPointer) { cx = lastPointer.x; cy = lastPointer.y; }
+      if (!isFinite(cx) || !isFinite(cy)) { cx = window.innerWidth / 2; cy = window.innerHeight / 2; }
+      tooltipEl.style.transform = 'none';
+      tooltipEl.style.bottom = 'auto';
+      tooltipEl.style.display = 'block';
+      const w = tooltipEl.offsetWidth || 360;
+      const h = tooltipEl.offsetHeight || 200;
+      const gap = 10;
+      let x = cx + 24;
+      if (x + w > window.innerWidth - 8) x = cx - w - 24;
+      if (x < 8) x = Math.max(8, Math.min(cx - w / 2, window.innerWidth - w - 8));
+      let y = cy - h / 2;
+      if (y < 64) y = 64;
+      if (y + h > window.innerHeight - gap) y = window.innerHeight - h - gap;
+      if (y < gap) y = gap;
+      tooltipEl.style.left = x + 'px';
+      tooltipEl.style.top = y + 'px';
+    }
+
+    // ★ 离开区块不立刻关：留 1.6 秒让鼠标挪到卡片上；鼠标停在卡片上就一直显示
+    let lastInsideAt = 0;
+    const HIDE_DELAY_MS = 1600;
+    function hideTooltipNow() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      lastInsideAt = 0;
+      tooltipEl.style.display = 'none';
+    }
+    function keepTooltip() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      lastInsideAt = Date.now();
+    }
+    function scheduleHide() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      hideTimer = setTimeout(function () {
+        hideTimer = null;
+        if (isOverBox) return;
+        if (Date.now() - lastInsideAt < HIDE_DELAY_MS - 50) return;
+        hideTooltipNow();
+      }, HIDE_DELAY_MS);
+    }
+
+    myChart.on('mouseover', function (params) {
+      const hoverHtml = (icelandData && icelandData.length) ? renderIcelandDetail(icelandData) : '';
+      if (!hoverHtml) return;
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      const ev = params && params.event && params.event.event;
+      if (ev) rememberMouse(Number(ev.clientX), Number(ev.clientY));
+      keepTooltip();
+      tooltipEl.innerHTML = hoverHtml;
+      placeTooltipAt();
+    });
+
+    myChart.on('mouseout', function () {
+      if (tooltipEl.style.display === 'block') scheduleHide();
+    });
+
+    // 卡片不动，鼠标移动只用来记录锚点、延长「不自动消失」的计时
+    document.getElementById('map').addEventListener('mousemove', function (e) {
+      if (!hoverAnchor) rememberMouse(e.clientX, e.clientY);
+      if (tooltipEl.style.display === 'block') {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      }
+    }, { passive: true });
+
+    tooltipEl.addEventListener('mouseenter', function () { isOverBox = true; keepTooltip(); });
+    tooltipEl.addEventListener('mouseleave', function () { isOverBox = false; hideTooltipNow(); });
+
+    document.getElementById('map').addEventListener('mouseleave', function () {
+      if (!isOverBox && tooltipEl.style.display === 'block') scheduleHide();
     });
 
     document.getElementById('detail-panel').addEventListener('click', function(e) {

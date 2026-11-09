@@ -1,0 +1,15 @@
+name = "horizonsimlabs-api"
+main = "worker/src/index.js"
+compatibility_date = "2025-01-01"
+
+# ============================================================
+# 独立部署的 Worker：https://horizonsimlabs-api.seeout360.workers.dev
+# 复用现有 D1（同一个 Cloudflare 账户），靠 database_id 定位
+# ============================================================
+[[d1_databases]]
+binding = "DB"
+database_name = "twikoo"
+database_id = "10ddc8fd-c236-4e0c-a866-416a02f30eb6"
+
+[observability]
+enabled = true

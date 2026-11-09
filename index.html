@@ -15,8 +15,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+            min-height: 100vh;
+            padding: 24px;
             background-image: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
         }
         h1 {
@@ -26,6 +26,7 @@
             margin-bottom: 3rem;
             background: linear-gradient(to right, #60a5fa, #a78bfa);
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
             text-align: center;
             text-shadow: 0 10px 30px rgba(96, 165, 250, 0.2);
@@ -54,6 +55,143 @@
             transform: translateY(-5px);
             box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
         }
+
+        /* ★ 左上角：上传地景插件 */
+        .upload-entry {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 18px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            background: rgba(30, 41, 59, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+        .upload-entry:hover {
+            background: rgba(59, 130, 246, 0.9);
+            border-color: #3b82f6;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px rgba(59, 130, 246, 0.35);
+        }
+
+        /* ★ 提交弹窗 */
+        .modal-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.72);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 16px;
+            overflow-y: auto;
+            z-index: 200;
+        }
+        .modal-mask.is-open { display: flex; }
+        .modal {
+            width: 100%;
+            max-width: 560px;
+            background: #16233b;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 26px 26px 22px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+            animation: modalIn 0.22s ease;
+        }
+        @keyframes modalIn { from { opacity: 0; transform: translateY(12px) scale(0.98); } to { opacity: 1; transform: none; } }
+        .modal h2 { font-size: 1.25rem; margin-bottom: 6px; }
+        .modal-sub { font-size: 0.85rem; color: #94a3b8; margin-bottom: 18px; line-height: 1.6; }
+        .field { margin-bottom: 14px; }
+        .field > label {
+            display: block;
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+        .field > label .req { color: #f87171; margin-left: 2px; }
+        .field input, .field textarea {
+            width: 100%;
+            padding: 10px 12px;
+            font: inherit;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .field input:focus, .field textarea:focus { border-color: #3b82f6; }
+        .field textarea { resize: vertical; min-height: 70px; line-height: 1.6; }
+        .field-row { display: flex; gap: 12px; }
+        .field-row .field { flex: 1; }
+        .field-row .field.grow { flex: 2.2; }
+        .hint { font-size: 0.75rem; color: #64748b; margin-top: 5px; line-height: 1.5; }
+
+        /* ★ 提交成功的 toast */
+        #upload-toast {
+            position: fixed;
+            left: 50%;
+            top: 24px;
+            transform: translate(-50%, -16px);
+            z-index: 400;
+            max-width: min(92vw, 460px);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #6ee7b7;
+            background: rgba(16, 34, 30, 0.96);
+            border: 1px solid rgba(52, 211, 153, 0.5);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.2, 0.9, 0.25, 1);
+        }
+        #upload-toast.show { opacity: 1; transform: translate(-50%, 0); }
+        .modal-actions { display: flex; gap: 12px; margin-top: 22px; }
+        .modal-actions button {
+            font: inherit;
+            font-size: 0.95rem;
+            font-weight: 600;
+            padding: 11px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.06);
+            color: #e2e8f0;
+            transition: all 0.2s;
+        }
+        .modal-actions button:hover { background: rgba(255, 255, 255, 0.12); }
+        .modal-actions .submit {
+            flex: 1;
+            background: linear-gradient(to right, #3b82f6, #6366f1);
+            border-color: transparent;
+            color: #fff;
+        }
+        .modal-actions .submit:hover { filter: brightness(1.1); }
+        .modal-actions button:disabled { opacity: 0.55; cursor: not-allowed; filter: none; }
+        .form-msg {
+            display: none;
+            margin-top: 16px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+        .form-msg.is-err { display: block; background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.45); color: #fca5a5; }
+        .form-msg.is-ok { display: block; background: rgba(52, 211, 153, 0.12); border: 1px solid rgba(52, 211, 153, 0.45); color: #6ee7b7; }
 
         /* ★ 公告栏样式 */
         .notice-board {
@@ -116,23 +254,88 @@
             color: #cbd5e1;
         }
 
-        /* 手机端适配：移到底部 */
         @media (max-width: 768px) {
+            .btn-group { flex-direction: column; gap: 16px; width: 100%; max-width: 320px; }
+            .btn { text-align: center; padding: 14px 24px; }
+            /* 公告栏从固定浮层改为页脚，避免遮挡主内容 */
             .notice-board {
-                top: auto;
-                bottom: 20px;
-                left: 20px;
-                right: 20px;
-                width: auto;
-                max-height: 200px;
-                padding: 15px;
+                position: static;
+                width: 100%;
+                max-width: 420px;
+                max-height: none;
+                margin: 28px 0 0;
+                padding: 16px;
             }
-            h1 { font-size: 2.5rem; }
+            .upload-entry { top: 14px; left: 14px; padding: 9px 14px; font-size: 0.85rem; }
+            h1 { font-size: 2.2rem; margin-bottom: 2rem; }
+            body { justify-content: flex-start; padding-top: 84px; }
+            .modal-mask { padding: 16px 12px; align-items: flex-start; }
+            .modal { padding: 20px 18px; }
+            .field-row { flex-direction: column; gap: 0; }
         }
     </style>
 </head>
 <body>
     
+    <!-- 左上角：上传地景插件 -->
+    <button type="button" class="upload-entry" id="upload-open">⬆ 上传你自己的地景插件</button>
+
+    <!-- 提交弹窗 -->
+    <div class="modal-mask" id="upload-modal" role="dialog" aria-modal="true" aria-labelledby="upload-title">
+        <div class="modal">
+            <h2 id="upload-title">上传你自己的地景插件</h2>
+            <div class="modal-sub">提交后会先进入审核队列，管理员通过之后才会出现在地图上。</div>
+
+            <form id="upload-form" novalidate>
+                <div class="field">
+                    <label for="f-name">地景名称<span class="req">*</span></label>
+                    <input id="f-name" name="name" maxlength="60" required placeholder="例如：上海 / 兰州">
+                    <div class="hint">写地景对应的城市或地区名称，和地图上的名字保持一致,本项请使用中文</div>
+                </div>
+
+                <div class="field">
+                    <label for="f-author">作者<span class="req">*</span></label>
+                    <input id="f-author" name="author" maxlength="60" placeholder="留下你的名字或昵称，方便致谢；没有就填「无|None」">
+                </div>
+
+                <div class="field-row">
+                    <div class="field grow">
+                        <label for="f-freeLink">免费版链接<span class="req">*</span></label>
+                        <input id="f-freeLink" name="freeLink" type="text" maxlength="300" placeholder="https://... 没有就填「无|None」">
+                    </div>
+                    <div class="field">
+                        <label for="f-freeLevel">免费版等级<span class="req">*</span></label>
+                        <input id="f-freeLevel" name="freeLevel" maxlength="40" placeholder="如 12，没有就填「无|None」">
+                    </div>
+                </div>
+
+                <div class="field-row">
+                    <div class="field grow">
+                        <label for="f-paidLink">付费版链接<span class="req">*</span></label>
+                        <input id="f-paidLink" name="paidLink" type="text" maxlength="300" placeholder="https://... 没有就填「无|None」">
+                    </div>
+                    <div class="field">
+                        <label for="f-paidLevel">付费版等级<span class="req">*</span></label>
+                        <input id="f-paidLevel" name="paidLevel" maxlength="40" placeholder="如 12，没有就填「无|None」">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="f-remark">备注<span class="req">*</span></label>
+                    <textarea id="f-remark" name="remark" maxlength="500" placeholder="如果支持 AF4 或双端支持，请写明；只支持 AFG 则不用特殊写。备注需中英双文，「中文|英文」，随便找个翻译器即可。没有别的要写就填「无|None」"></textarea>
+                    <div class="hint">上面每一栏都是必填项，没有就填「无|None」；链接填了的话需以 http:// 或 https:// 开头。</div>
+                </div>
+
+                <div class="form-msg" id="upload-msg"></div>
+
+                <div class="modal-actions">
+                    <button type="button" id="upload-cancel">取消</button>
+                    <button type="submit" class="submit" id="upload-submit">提交审核</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- 公告栏容器 -->
     <div class="notice-board">
         <div class="notice-title">最新公告</div>
@@ -183,6 +386,137 @@
 
         // 页面加载时执行
         loadNotices();
+    </script>
+
+    <script>
+        /* ============================================================
+         * 上传地景插件：表单 → POST /api/submissions
+         * ============================================================ */
+        (function () {
+            var API = 'https://horizonsimlabs-api.seeout360.workers.dev/api/submissions';
+            var mask = document.getElementById('upload-modal');
+            var form = document.getElementById('upload-form');
+            var msg = document.getElementById('upload-msg');
+            var submitBtn = document.getElementById('upload-submit');
+
+            function openModal() {
+                mask.classList.add('is-open');
+                if (!msg.classList.contains('is-ok')) {
+                    msg.className = 'form-msg';
+                    msg.textContent = '';
+                }
+                document.getElementById('f-name').focus();
+            }
+
+            /* 成功时直接关弹窗 + 弹一个 toast。
+               注意：不能只 form.reset()，因为 reset 会把字段恢复成 HTML 里写死的 value
+               （例如 value="无"），下次打开就带着上次的占位内容，容易被误提交。 */
+            function closeModal(keepMsg) {
+                mask.classList.remove('is-open');
+                if (!keepMsg) { msg.className = 'form-msg'; msg.textContent = ''; }
+            }
+
+            function toast(text) {
+                var old = document.getElementById('upload-toast');
+                if (old) old.remove();
+                var el = document.createElement('div');
+                el.id = 'upload-toast';
+                el.textContent = text;
+                document.body.appendChild(el);
+                requestAnimationFrame(function () { el.classList.add('show'); });
+                setTimeout(function () {
+                    el.classList.remove('show');
+                    setTimeout(function () { el.remove(); }, 320);
+                }, 3600);
+            }
+
+            function clearForm() {
+                ['name', 'author', 'freeLink', 'freeLevel', 'paidLink', 'paidLevel', 'remark'].forEach(function (k) {
+                    if (form[k]) form[k].value = '';
+                });
+            }
+
+            function showMsg(text, ok) {
+                msg.textContent = text;
+                msg.className = 'form-msg ' + (ok ? 'is-ok' : 'is-err');
+            }
+
+            document.getElementById('upload-open').addEventListener('click', openModal);
+            document.getElementById('upload-cancel').addEventListener('click', function () { closeModal(); });
+            mask.addEventListener('click', function (e) { if (e.target === mask) closeModal(); });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && mask.classList.contains('is-open')) closeModal();
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var data = {
+                    name: form.name.value.trim(),
+                    author: form.author.value.trim(),
+                    freeLink: form.freeLink.value.trim(),
+                    freeLevel: form.freeLevel.value.trim(),
+                    paidLink: form.paidLink.value.trim(),
+                    paidLevel: form.paidLevel.value.trim(),
+                    remark: form.remark.value.trim()
+                };
+
+                // 前端先做一遍校验，省一次请求；所有字段必填，没有就填「无|None」
+                var EMPTY = /^(无|沒有|没有|none|-|—|－|n\/a|na|null|空)(\s*[|｜/]\s*(none|无)|)$/i;
+                var NONE = '无|None';
+                var isNone = function (v) { return !v || EMPTY.test(String(v).trim()); };
+                // 用户可能写「无」「None」「无/None」，统一规范成「无|None」
+                var normNone = function (v) { var s = String(v).trim(); return isNone(s) ? NONE : s; };
+                var linkOk = function (u) { return isNone(u) || /^https?:\/\/\S+$/i.test(String(u).trim()); };
+                var sep = function (v) { return !/[;；]/.test(v); };
+
+                if (!data.name) { showMsg('地景名称是必填项', false); form.name.focus(); return; }
+                if (!sep(data.name)) { showMsg('地景名称里不能有分号（; 或 ；）', false); form.name.focus(); return; }
+                if (!data.author) { showMsg('作者是必填项，没有就填「' + NONE + '」', false); form.author.focus(); return; }
+                if (!data.freeLink) { showMsg('免费版链接是必填项，没有就填「' + NONE + '」', false); form.freeLink.focus(); return; }
+                if (!data.freeLevel) { showMsg('免费版等级是必填项，没有就填「' + NONE + '」', false); form.freeLevel.focus(); return; }
+                if (!data.paidLink) { showMsg('付费版链接是必填项，没有就填「' + NONE + '」', false); form.paidLink.focus(); return; }
+                if (!data.paidLevel) { showMsg('付费版等级是必填项，没有就填「' + NONE + '」', false); form.paidLevel.focus(); return; }
+                if (!data.remark) { showMsg('备注是必填项，没有就填「' + NONE + '」', false); form.remark.focus(); return; }
+                if (!linkOk(data.freeLink)) { showMsg('免费版链接要以 http:// 或 https:// 开头，没有请填「' + NONE + '」', false); form.freeLink.focus(); return; }
+                if (!linkOk(data.paidLink)) { showMsg('付费版链接要以 http:// 或 https:// 开头，没有请填「' + NONE + '」', false); form.paidLink.focus(); return; }
+                if (isNone(data.freeLink) && isNone(data.paidLink)) { showMsg('免费版链接和付费版链接至少要有一个真链接（两个都填「' + NONE + '」地图上点了没东西可下）', false); return; }
+
+                // 入库前统一规范成「无|None」，与 done.json 历史数据一致
+                data.author = normNone(data.author);
+                data.freeLink = normNone(data.freeLink);
+                data.freeLevel = normNone(data.freeLevel);
+                data.paidLink = normNone(data.paidLink);
+                data.paidLevel = normNone(data.paidLevel);
+                data.remark = normNone(data.remark);
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = '提交中…';
+
+                fetch(API, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(function (res) {
+                    return res.json().catch(function () {
+                        return { ok: false, error: res.status >= 500 ? '服务器出错（HTTP ' + res.status + '），稍后再试' : '服务返回异常（HTTP ' + res.status + '）' };
+                    });
+                }).then(function (body) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '提交审核';
+                    if (body && body.ok) {
+                        clearForm();
+                        closeModal();
+                        toast('提交成功，等待管理员审核，通过后会出现在地图上。');
+                    } else {
+                        showMsg((body && body.error) || '提交失败，请稍后再试', false);
+                    }
+                }).catch(function () {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = '提交审核';
+                    showMsg('网络错误，提交失败，请稍后再试', false);
+                });
+            });
+        })();
     </script>
 </body>
 </html>

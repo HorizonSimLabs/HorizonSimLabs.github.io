@@ -10,13 +10,10 @@
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
-    #my-tooltip {
-      position: fixed; background: #fff; border: 2px solid #1890ff; border-radius: 8px;
-      padding: 12px 16px; font: 14px/1.6 system-ui, sans-serif; color: #333;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.15); display: none; pointer-events: auto; z-index: 99999; white-space: nowrap;
-    }
-    .my-link { color: #1890ff; text-decoration: none; font-weight: bold; }
-    .my-link:hover { text-decoration: underline; }
+    /* 卡片外观统一交给 ../assets/scenery.css（深/浅色主题自动适配） */
+    #my-tooltip { white-space: nowrap; }
+    #my-tooltip .my-link { text-decoration: none; }
+    #my-tooltip .my-link:hover { text-decoration: underline; }
     .ui-btn {
       position: fixed; top: 15px; padding: 8px 16px; background: rgba(15, 23, 42, 0.8); color: white;
       border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; cursor: pointer; font-size: 14px; 
@@ -29,6 +26,39 @@
     #lang-btn:hover { background: #059669; }
     #loading-tip { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 16px; z-index: 1; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
+  
+    /* ===== 悬停信息卡片（自带样式，不依赖 assets/scenery.css） ===== */
+    #my-tooltip {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 99999; display: none;
+      width: min(360px, calc(100vw - 32px)); max-height: min(72vh, 560px);
+      overflow-y: auto; overscroll-behavior: contain;
+      padding: 14px 16px; box-sizing: border-box;
+      background: #ffffff; color: #1b2436;
+      border: 1px solid #cfd8e6; border-radius: 14px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+      font-size: 14px; line-height: 1.7; white-space: normal; text-align: left;
+    }
+    #my-tooltip .tip-title { font-weight: 700; font-size: 15px; color: #101a2c; margin-bottom: 6px; }
+    #my-tooltip .tip-sub { font-size: 12px; color: #7a8699; margin-bottom: 6px; }
+    #my-tooltip .tip-plain { color: #101a2c; }
+    #my-tooltip .tip-row { color: #3d4a60; }
+    #my-tooltip .tip-row .lv { color: #7a8699; }
+    #my-tooltip .tip-row--indent { padding-left: 10px; }
+    #my-tooltip .tip-none { color: #7a8699; }
+    #my-tooltip .tip-remark { color: #3d4a60; margin-top: 6px; }
+    #my-tooltip .tip-hr,
+    #my-tooltip hr { border: none; border-top: 1px dashed #dbe3ee; margin: 10px 0; }
+    #my-tooltip .tip-index {
+      display: inline-block; margin-bottom: 4px; padding: 1px 7px; border-radius: 999px;
+      background: #eaf1ff; color: #2f6bd8; font-size: 12px;
+    }
+    #my-tooltip .tip-item--sep { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #dbe3ee; }
+    #my-tooltip .tip-sec--sep { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #dbe3ee; }
+    #my-tooltip .my-link {
+      display: inline-block; margin-left: 6px; padding: 1px 9px; border-radius: 999px;
+      background: #2f6bd8; color: #ffffff; font-size: 13px; text-decoration: none;
+    }
+    #my-tooltip .my-link:hover { background: #2458b8; text-decoration: none; }
   </style>
 </head>
 <body>
@@ -40,7 +70,82 @@
 
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+    // ★ 之前用 'ontouchstart' in window 判定手机，触屏笔记本/二合一平板会被误判成手机，
+    //   于是根本不注册 mouseover —— 鼠标放上去什么都不显示。现在只按 UA 判定。
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    // 鼠标当前位置（给悬停卡片定位兜底用）
+    const lastPointer = { x: 200, y: 200 };
+    window.addEventListener('mousemove', function (e) { lastPointer.x = e.clientX; lastPointer.y = e.clientY; }, { passive: true });
+
+    // 名字归一化：去首尾空格、全角空格、统一 NFC（Halsnæs / Høje-Taastrup 这类字母要对得上）
+
+
+
+    // 卡片要显示在「当前鼠标悬停的区块」旁边（按悬停点算位置，不跟鼠标移动）
+    let hoverAnchor = null;
+    function rememberMouse(x, y) {
+      if (!isFinite(x) || !isFinite(y)) return;
+      hoverAnchor = { x: x, y: y };
+    }
+    function placeTooltipAt() {
+      let cx = null, cy = null;
+      if (hoverAnchor) { cx = hoverAnchor.x; cy = hoverAnchor.y; }
+      if (cx === null && lastPointer) { cx = lastPointer.clientX || lastPointer.x; cy = lastPointer.clientY || lastPointer.y; }
+      if (!isFinite(cx) || !isFinite(cy)) { cx = window.innerWidth / 2; cy = window.innerHeight / 2; }
+      tooltipEl.style.display = 'block';
+      tooltipEl.style.transform = 'none';
+      tooltipEl.style.bottom = 'auto';
+      const w = tooltipEl.offsetWidth || 360;
+      const h = tooltipEl.offsetHeight || 200;
+      const gap = 10;
+      // 默认放在鼠标右侧；右边放不下就翻到左边；上下夹在可视区内（顶部留出按钮高度）
+      let x = cx + 24;
+      if (x + w > window.innerWidth - 8) x = cx - w - 24;
+      if (x < 8) x = Math.max(8, Math.min(cx - w / 2, window.innerWidth - w - 8));
+      let y = cy - h / 2;
+      if (y < 64) y = 64;
+      if (y + h > window.innerHeight - gap) y = window.innerHeight - h - gap;
+      if (y < gap) y = gap;
+      tooltipEl.style.left = x + 'px';
+      tooltipEl.style.top = y + 'px';
+    }
+    // ★ 是否还停在同一个区块上：鼠标从绿色区域挪向卡片时会路过没地景的地方，
+    //   这段时间不能把卡片关掉，否则来不及把鼠标放上去。
+    let lastInsideAt = 0;
+    const HIDE_DELAY_MS = 1600;
+    function hideTooltipNow() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      lastInsideAt = 0;
+      tooltipEl.style.display = 'none';
+      currentHoverName = null;
+      tooltipEl.__areaName = '';
+      tooltipEl.nameAttr = '';
+    }
+    function scheduleHide() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      hideTimer = setTimeout(function () {
+        hideTimer = null;
+        // 计时结束时鼠标若回到了区块上、或已经停在卡片上，就继续显示
+        if (isOverBox) return;
+        if (Date.now() - lastInsideAt < HIDE_DELAY_MS - 50) return;
+        hideTooltipNow();
+      }, HIDE_DELAY_MS);
+    }
+    function keepTooltip() {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      lastInsideAt = Date.now();
+    }
+    function normAreaName(n) {
+      let s = String(n || '').replace(/[\u00a0\u3000]/g, ' ').trim();
+      try { if (s.normalize) s = s.normalize('NFC'); } catch (e) { }
+      return s;
+    }
+    // 把 provinceDataMap 里所有卡片按归一化名字登记一份，悬停时直接查
+    function buildHoverIndex() {
+      const idx = {};
+      Object.keys(provinceDataMap || {}).forEach(function (k) { idx[normAreaName(k)] = provinceDataMap[k]; });
+      return idx;
+    }
     let currentLang = 'zh';
 
     const i18n = {
@@ -112,6 +217,18 @@
       return (parts[1] || parts[0]).trim();
     }
 
+    // ==================== 卡片渲染 ====================
+    // ★ 一个地点可能有多个作者做的插件。buildHtml 负责「单条」卡片，
+    //   renderNodeHtml 负责「把同一地点的所有条目拼起来」——不再只显示第一条。
+    function formatCardLink(link, t) {
+      if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
+      const lower = String(link).toLowerCase();
+      if (lower.startsWith('http://') || lower.startsWith('https://')) {
+        return '<a class="my-link" href="' + link + '" target="_blank" rel="noopener">' + t.clickDownload + '</a>';
+      }
+      return '<span class="tip-plain">' + link + '</span>';
+    }
+
     function buildHtml(rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark) {
       const t = i18n[currentLang];
       const displayAuthor = parseBilingual(author);
@@ -123,28 +240,77 @@
 
       const key = cleanKpName(rawProvince);
       const titleName = kpMapDict[key] ? getTranslatedName(key) : rawProvince;
+      const subtitleRaw = titleName !== rawProvince ? rawProvince : '';
+      let html = '<div class="tip-title">' + titleName + '</div>';
+      if (subtitleRaw) html += '<div class="tip-sub">' + parseBilingual(subtitleRaw) + '</div>';
 
-      let html = `<div style="font-weight:bold;font-size:15px;margin-bottom:5px;">【${titleName}】</div>`;
-      if (titleName !== rawProvince) html += `<div style="font-size:12px;color:#888;margin-bottom:5px;">(${rawProvince})</div>`;
-      html += `<div>${t.author}${displayAuthor || t.unknown}</div>`;
-      html += `<div>${t.download}</div>`;
-      
-      function formatLink(link) {
-        if (!link || link === '无' || link === 'None' || link === 'null') return t.noLink;
-        if (link.toLowerCase().startsWith('http')) return `<a class="my-link" href="${link}" target="_blank">${t.clickDownload}</a>`;
-        return `<span style="color:#333; font-weight:bold;">${link}</span>`;
+      html += '<div class="tip-row">' + t.author + '<b>' + (displayAuthor || t.unknown) + '</b></div>';
+      html += '<div class="tip-row">' + t.download + '</div>';
+
+      if (parsedFreeLink || displayFreeLevel) {
+        html += '<div class="tip-row tip-row--indent"><span class="lv">' + t.free + (displayFreeLevel ? ' (' + displayFreeLevel + ')' : '') + '</span>' + formatCardLink(parsedFreeLink, t) + '</div>';
       }
+      if (parsedPaidLink || displayPaidLevel) {
+        html += '<div class="tip-row tip-row--indent"><span class="lv">' + t.paid + (displayPaidLevel ? ' (' + displayPaidLevel + ')' : '') + '</span>' + formatCardLink(parsedPaidLink, t) + '</div>';
+      }
+      if (displayRemark) html += '<div class="tip-remark">' + t.remark + displayRemark + '</div>';
 
-      if (parsedFreeLink || displayFreeLevel) html += `<div style="margin-left:10px;">${t.free}${displayFreeLevel ? ' (' + displayFreeLevel + ')' : ''}: ${formatLink(parsedFreeLink)}</div>`;
-      if (parsedPaidLink || displayPaidLevel) html += `<div style="margin-left:10px;">${t.paid}${displayPaidLevel ? ' (' + displayPaidLevel + ')' : ''}: ${formatLink(parsedPaidLink)}</div>`;
-      if (displayRemark) html += `<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #ccc; color:#666; font-size:12px; white-space:normal; max-width:300px;">${t.remark}${displayRemark}</div>`;
-      
       return html;
     }
+
+    // ★ 同一地点的多个插件全部显示：多于一条时加「第几条 / 共几条」和分隔线
+    function renderNodeHtml(items) {
+      if (!items || !items.length) return '';
+      if (items.length === 1) {
+        const it = items[0];
+        return buildHtml(it.rawProvince, it.author, it.freeLink, it.freeLevel, it.paidLink, it.paidLevel, it.remark);
+      }
+      const total = items.length;
+      let out = '';
+      items.forEach(function (it, idx) {
+        const card = buildHtml(it.rawProvince, it.author, it.freeLink, it.freeLevel, it.paidLink, it.paidLevel, it.remark);
+        const cls = idx === 0 ? 'tip-item' : 'tip-item tip-item--sep';
+        out += '<div class="' + cls + '"><span class="tip-index">' + (idx + 1) + '/' + total + '</span>' + card + '</div>';
+      });
+      return out;
+    }
+
 
     const myChart = echarts.init(document.getElementById('map'));
     let allParsedData = [];
     const provinceDataMap = {};
+
+
+
+    // ==================== 地景数据：Cloudflare D1 接口 ====================
+    // 数据源已从静态文件 done.json 换成 D1（Cloudflare Worker + D1 scenery 表）。
+    // 接口返回 { ok: true, count, data: [{ rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark }] }
+    // 出错时自动回落到站点根目录的 done.json，保证页面不会白板。
+    const LANDSCAPES_API = 'https://horizonsimlabs-api.seeout360.workers.dev/api/landscapes';
+
+    // 接口成功 → 返回对象；回落 done.json → 返回原始文本（parseDoneJson 两种都认）
+    async function landscapeSource(res) {
+      if (res && res.data && Array.isArray(res.data)) return res;
+      if (res && typeof res.raw === 'string') return res.raw;
+      if (res && typeof res.text === 'function') return await res.text();
+      return res;
+    }
+
+    async function fetchLandscapes() {
+      try {
+        const res = await fetch(LANDSCAPES_API + (LANDSCAPES_API.indexOf('?') < 0 ? '?t=' : '&t=') + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data || data.ok === false || !Array.isArray(data.data)) throw new Error('接口返回格式不正确');
+        console.info('[地景数据] 来自 D1 接口：' + data.data.length + ' 条');
+        return data;
+      } catch (e) {
+        console.warn('D1 接口不可用，回落到 ../done.json', e);
+        const res = await fetch('../done.json?t=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return { ok: true, count: -1, data: null, raw: await res.text() };
+      }
+    }
 
     // ==================== done.json 解析 ====================
     // ★ 必须按「行」解析。
@@ -155,6 +321,23 @@
     function parseDoneJson(rawText) {
       const result = [];
       if (!rawText) return result;
+
+      // ★ D1 接口返回的是 { ok, count, data: [...] } 这样的对象，直接把每条记录映射成同样结构
+      if (typeof rawText === 'object') {
+        const list = Array.isArray(rawText) ? rawText : (Array.isArray(rawText.data) ? rawText.data : []);
+        list.forEach(item => {
+          const rawProvince = String(item.rawProvince || '').trim();
+          if (!rawProvince) return;
+          result.push({
+            rawProvince: rawProvince,
+            author: item.author || i18n[currentLang].unknown,
+            freeLink: item.freeLink || '', freeLevel: item.freeLevel || '',
+            paidLink: item.paidLink || '', paidLevel: item.paidLevel || '',
+            remark: item.remark || ''
+          });
+        });
+        return result;
+      }
 
       const body = rawText.replace(/^\s*\[/, '').replace(/\]\s*$/, '');
 
@@ -192,10 +375,10 @@
       allParsedData = [];
       const t = i18n[currentLang];
       try {
-        let doneRes = await fetch('../done.json?t=' + new Date().getTime());
+        const doneRes = await fetchLandscapes();
         if (doneRes.ok) {
           // ★ 按行解析，避免备注里的英文逗号把条目切断
-          allParsedData = parseDoneJson(await doneRes.text());
+          allParsedData = parseDoneJson(await landscapeSource(doneRes));
         }
       } catch (e) { console.error("读取 done.json 失败", e); }
     }
@@ -234,14 +417,14 @@
 
           if (items.length > 0) {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            provinceDataMap[featureName] = items
-              .map(item => buildHtml(item.rawProvince, item.author, item.freeLink, item.freeLevel, item.paidLink, item.paidLevel, item.remark))
-              .join('<hr style="border:none; border-top:1px dashed #ccc; margin:8px 0;"/>');
+            provinceDataMap[featureName] = renderNodeHtml(items);
           }
         });
 
         myChart.hideLoading();
         document.getElementById('loading-tip').style.display = 'none';
+
+        myChart.__hoverIndex = buildHoverIndex();
 
         myChart.setOption({
           tooltip: { show: false },
@@ -286,39 +469,207 @@
       updateUI(); await fetchData(); renderMap();
     });
 
-    if (!isMobile) {
-      let isOverBox = false; let hideTimer = null; let currentHoverName = null;
-      myChart.on('mouseover', function (params) {
-        if (!provinceDataMap[params.name] || isOverBox || currentHoverName === params.name) return;
-        clearTimeout(hideTimer); currentHoverName = params.name;
-        tooltipEl.innerHTML = provinceDataMap[params.name];
-        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
-        if (params.event && params.event.event) {
-          const e = params.event.event;
-          let x = e.clientX + 20; let y = e.clientY - 20;
-          if (x + tooltipEl.offsetWidth > window.innerWidth) x = e.clientX - tooltipEl.offsetWidth - 20;
-          if (y + tooltipEl.offsetHeight > window.innerHeight) y = window.innerHeight - tooltipEl.offsetHeight - 10;
-          if (y < 10) y = 10;
-          tooltipEl.style.left = x + 'px'; tooltipEl.style.top = y + 'px';
+    // ★ 悬停/点击一律走自定义卡片（#my-tooltip）：
+    //   不再用 `if (!isMobile)` 判断，否则「触屏笔记本 / 带触摸屏的显示器」会被当成手机，
+    //   鼠标放上去什么都不显示。真正的手机仍然用点击弹卡片，靠指针类型区分。
+    let touchOnly = false;
+    try { touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches; } catch (e) { touchOnly = false; }
+    let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+    {
+    // ★ 兜底：鼠标停在地图上但 ECharts 没发 mouseover 时（停在边框上、标签上、或色块边缘），
+    //   用自己的坐标 → 经纬度 → 包含该点的要素来查卡片。这是「鼠标放上去没反应」的最后一道保险。
+    (function () {
+      let raf = 0;
+// GeoJSON/ 里是 ECharts 压缩格式（UTF8Encoding:true），环是字符串而不是点数组。
+      // ECharts 自己 internals 会解，但这里拿到的 geoJSON 仍可能是原样字符串，必须现场解一次。
+      function polyRings(poly) {
+        if (!poly || !poly.length) return [];
+        if (Array.isArray(poly[0])) return poly;      // 已经是点数组
+        // 单个压缩环 → 解成点数组
+        const s = poly;
+        const out = [];
+        let x = 0, y = 0;
+        for (let i = 0; i + 1 < s.length; i += 2) {
+          const nx = s.charCodeAt(i) - 64, ny = s.charCodeAt(i + 1) - 64;
+          x += (nx >> 1) ^ (-(nx & 1));
+          y += (ny >> 1) ^ (-(ny & 1));
+          if (x === 0 && y === 0) break;
+          out.push([x / 1024, y / 1024]);
         }
+        return [out];
+      }
+let cachedGeo = null;
+      function getDecodedGeo() {
+        if (cachedGeo) return cachedGeo;
+        const opt = myChart.getOption && myChart.getOption();
+        const mapName = opt && opt.series && opt.series[0] && opt.series[0].map;
+        if (!mapName || !echarts.getMap) return null;
+        const mapObj = echarts.getMap(mapName);
+        const raw = mapObj && (mapObj.geoJSON || mapObj.geoJson);
+        if (!raw || !raw.features) return null;
+        // 页面自己有 decodeGeoJson（丹麦/马来西亚等）就复用，保证解码口径一致
+        try {
+          if (typeof decodeGeoJson === 'function' && raw.UTF8Encoding !== false) {
+            const d = decodeGeoJson(raw);
+            if (d && d.features && d.features[0] && d.features[0].geometry && Array.isArray(d.features[0].geometry.coordinates)) { cachedGeo = d; return d; }
+          }
+        } catch (e) { /* 走下面的兜底解码 */ }
+        cachedGeo = { type: 'FeatureCollection', features: raw.features.map(function (f) { return { type: 'Feature', properties: f.properties || {}, geometry: { type: f.geometry.type, coordinates: decodePolys(f.geometry) } }; }) };
+        return cachedGeo;
+      }
+      function ringPoints(s, off) {
+        if (Array.isArray(s)) return s;
+        let x = 0, y = 0, i = 0;
+        if (typeof s !== 'string') return [];
+        // 官方格式：首两字符是 64+首点x、64+首点y
+        if (s.charCodeAt(0) === 64 && s.length > 2) {
+          x = s.charCodeAt(1) - 64;
+          y = s.charCodeAt(2) - 64;
+          i = 3;
+        }
+        if (Array.isArray(off) && off.length === 2) { x = off[0]; y = off[1]; }
+        const out = [];
+        for (; i + 1 < s.length; i += 2) {
+          const nx = s.charCodeAt(i) - 64, ny = s.charCodeAt(i + 1) - 64;
+          x += (nx >> 1) ^ (-(nx & 1));
+          y += (ny >> 1) ^ (-(ny & 1));
+          if (x === 0 && y === 0) break;
+          out.push([x / 1024, y / 1024]);
+        }
+        return out;
+      }
+      // 返回 [[环,[环]...], ...]：外环 + 洞
+      function decodePolys(g) {
+        const offs = g.encodeOffsets || null;
+        function normRing(node, off) {
+          if (typeof node === 'string') return [ringPoints(node, off)];
+          if (Array.isArray(node) && node.length && typeof node[0] === 'string') return [ringPoints(node[0], Array.isArray(off) ? off[0] : null)];
+          return [];
+        }
+        const isStr = v => typeof v === 'string';
+        const isPt = v => Array.isArray(v) && v.length >= 2 && typeof v[0] === 'number';
+        function walk(node, off, acc) {
+          if (isStr(node)) { acc.push(ringPoints(node, off)); return; }
+          if (!Array.isArray(node)) return;
+          if (node.length && node.every(p => Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number')) { acc.push(node); return; }
+          const flatStr = node.every(x => isStr(x));
+          if (flatStr) {
+            node.forEach((s, i) => acc.push(ringPoints(s, Array.isArray(off) && Array.isArray(off[i]) ? off[i] : null)));
+            return;
+          }
+          node.forEach((child, i) => walk(child, Array.isArray(off) ? off[i] : null, acc));
+        }
+        const rings = [];
+        walk(g.coordinates, offs, rings);
+        return rings.filter(r => r && r.length > 2);
+      }
+      function pickByPoint(px, py) {
+        const geo = getDecodedGeo();
+        if (!geo) return null;
+        const pt = myChart.convertFromPixel({ seriesIndex: 0 }, [px, py]);
+        if (!pt || !isFinite(pt[0]) || !isFinite(pt[1])) return null;
+        const lng = pt[0], lat = pt[1];
+        // ★ 多岛国家（澳大利亚/日本/新西兰等）的要素由很多个多边形拼成，
+        //   直接用「第一个环=外环、其余环=洞」的判定会漏掉大半国土（例如新南威尔士的主岛），
+        //   这里改成「命中任意一个环就算在里面」，多个要素同时命中就取面积最小的那个（飞地更具体）。
+        let bestName = null, bestRatio = -1;
+        for (let i = 0; i < geo.features.length; i++) {
+          const f2 = geo.features[i];
+          const g2 = f2 && f2.geometry;
+          const nm2 = f2 && f2.properties && f2.properties.name;
+          if (!g2 || !nm2 || !Array.isArray(g2.coordinates)) continue;
+          let hit = false;
+          for (let ri = 0; ri < g2.coordinates.length; ri++) {
+            const ring = g2.coordinates[ri];
+            if (!ring || ring.length < 3) continue;
+            let inside2 = false;
+            for (let ci = 0, cj = ring.length - 1; ci < ring.length; cj = ci++) {
+              const xi = ring[ci][0], yi = ring[ci][1];
+              const xj = ring[cj][0], yj = ring[cj][1];
+              if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi)) inside2 = !inside2;
+            }
+            if (inside2) hit = true;
+          }
+          if (!hit) continue;
+          // 用要素包围盒对角线的倒数当「大小」，越小越具体
+          const bb = (f2.__bb || (f2.__bb = (function () {
+            let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+            g2.coordinates.forEach(function (r) { r.forEach(function (q) { if (q[0] < x0) x0 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[0] > x1) x1 = q[0]; if (q[1] > y1) y1 = q[1]; }); });
+            return [x0, y0, x1, y1];
+          })()));
+          const size = Math.sqrt((bb[2] - bb[0]) ** 2 + (bb[3] - bb[1]) ** 2) || 1;
+          const ratio = 1 / size;
+          if (ratio > bestRatio) { bestRatio = ratio; bestName = nm2; }
+        }
+        if (bestName) return bestName;
+return null;
+      }
+      const holder = document.getElementById('map');
+      if (!holder) return;
+      holder.addEventListener('mousemove', function (e) {
+        // 卡片位置固定，不跟鼠标移动；这里只负责记录锚点、维持「还在区块上」的状态
+        lastPointer && Object.assign(lastPointer, { clientX: e.clientX, clientY: e.clientY, x: e.clientX, y: e.clientY });
+        if (!currentHoverName) rememberMouse(e.clientX, e.clientY);
+        if (raf) return;
+        raf = setTimeout(function () {
+          raf = 0;
+          if (isOverBox) return;
+          const rect = holder.getBoundingClientRect();
+          const name = pickByPoint(e.clientX - rect.left, e.clientY - rect.top);
+          const html = (myChart.__hoverIndex || {})[normAreaName(name)] || provinceDataMap[name];
+          if (name && html) {
+            keepTooltip();
+            if (currentHoverName !== name || tooltipEl.style.display !== 'block') {
+              currentHoverName = name;
+              tooltipEl.__areaName = name;
+              tooltipEl.nameAttr = name;
+              tooltipEl.innerHTML = html;
+              rememberMouse(e.clientX, e.clientY);
+              placeTooltipAt();
+            }
+            return;
+          }
+          // 鼠标不在任何地景区块上：若卡片还开着，给足够时间让鼠标挪到卡片上
+          if (currentHoverName && !hideTimer) scheduleHide();
+        });
+      }, { passive: true });
+      holder.addEventListener('mouseleave', function () {
+        if (!isOverBox) scheduleHide();
+      });
+    })();
+
+      myChart.on('mouseover', function (params) {
+        const hoverName = params && (params.name || (params.data && params.data.name));
+        const hoverHtml = hoverName ? ((myChart.__hoverIndex || {})[normAreaName(hoverName)] || provinceDataMap[hoverName]) : '';
+        if (!hoverHtml || isOverBox || currentHoverName === hoverName) return;
+        clearTimeout(hideTimer); currentHoverName = params.name;
+        tooltipEl.innerHTML = hoverHtml;
+        tooltipEl.style.transform = 'none'; tooltipEl.style.bottom = 'auto'; tooltipEl.style.display = 'block';
+        // ★ 定位兜底：有时拿不到 ECharts 事件坐标（鼠标从地图外移入、触屏板的鼠标等），
+        //   旧逻辑会跳过定位，卡片停在左上角并被顶部按钮盖住，看起来就是「不显示」。
+        const e = (params.event && params.event.event) || lastPointer || { x: 200, y: 200 };
+        const evx = Number(e.clientX), evy = Number(e.clientY);
+        rememberMouse(isFinite(evx) ? evx : 200, isFinite(evy) ? evy : 200);
+        placeTooltipAt();
       });
       myChart.on('mouseout', function () {
-        hideTimer = setTimeout(() => { if (!isOverBox) { tooltipEl.style.display = 'none'; currentHoverName = null; } }, 300);
+        // 离开区块不立刻关，留给用户把鼠标挪到卡片上的时间
+        if (currentHoverName && !hideTimer) scheduleHide();
       });
-      tooltipEl.addEventListener('mouseenter', () => { isOverBox = true; clearTimeout(hideTimer); });
-      tooltipEl.addEventListener('mouseleave', () => { isOverBox = false; tooltipEl.style.display = 'none'; currentHoverName = null; });
+      tooltipEl.addEventListener('mouseenter', function () { isOverBox = true; keepTooltip(); });
+      tooltipEl.addEventListener('mouseleave', function () { isOverBox = false; hideTooltipNow(); });
     }
 
     myChart.on('click', function(params) {
-      if (isMobile && provinceDataMap[params.name]) {
-        tooltipEl.innerHTML = provinceDataMap[params.name];
+      if (touchOnly && provinceDataMap[params.name]) {
+        tooltipEl.innerHTML = hoverHtml;
         tooltipEl.style.display = 'block'; tooltipEl.style.left = '50%'; tooltipEl.style.top = 'auto';
         tooltipEl.style.bottom = '50px'; tooltipEl.style.transform = 'translateX(-50%)';
       }
     });
     
     myChart.getZr().on('click', function (event) {
-      if (isMobile && !event.target) tooltipEl.style.display = 'none';
+      if (touchOnly && !event.target) tooltipEl.style.display = 'none';
     });
 
     window.addEventListener('resize', () => myChart.resize());
