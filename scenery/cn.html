@@ -26,6 +26,8 @@
     #lang-btn { right: 15px; background: #10b981; border-color: #10b981; }
     #lang-btn:hover { background: #059669; }
     @media (max-width: 768px) { #my-tooltip { font-size: 13px; padding: 10px 14px; } }
+    /* ★ 手机端卡片固定贴在底部，不能被地图手势滑动带走 */
+    #my-tooltip { touch-action: pan-y; }
   
     /* ===== 悬停信息卡片（自带样式，不依赖 assets/scenery.css） ===== */
     #my-tooltip {
@@ -266,6 +268,10 @@
     let allowedDrillProvinces = new Set(); 
     const provinceDataMap = {};
     let currentMapId = null;
+    // ★ 点击进入的省份地图，要跳过「点击→下钻」这一步，否则在省内点任何一个市都会再去找 mapId，
+    //   找不到就什么都不发生（表现为「市点不动、也看不到详细信息」）。
+    let inProvinceView = false;
+    let renderSeq = 0;
 
     function getTranslatedName(rawName) {
       if (currentLang === 'zh') return rawName;
@@ -477,86 +483,116 @@
     async function renderMap(mapId = null, isProvince = false) {
       const t = i18n[currentLang];
       currentMapId = mapId;
+      inProvinceView = !!isProvince;
+      const mySeq = ++renderSeq;
       myChart.showLoading();
-      
+
       try {
-        const url = mapId 
+        const url = isProvince && mapId
           ? `https://geo.datav.aliyun.com/areas_v3/bound/${mapId}_full.json`
           : 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
-        
+
         const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         const geoJson = await res.json();
-        
-        const currentMapName = mapId ? `map_${mapId}` : 'china';
+        // 连续快速点击（全国 → 省 → 返回）时，只让最后一次请求的结果生效
+        if (mySeq !== renderSeq) return;
+
+        // ★ 地图注册名固定：省图和全国图共用 'china'。
+        //   之前用 map_${mapId} 生成新名字，ECharts 会把标了数据的新 map 当成「换地图」，
+        //   连同 hover/click 命中一起失效，导致省内各市既点不动也不出卡片。
+        const currentMapName = 'china';
         echarts.registerMap(currentMapName, geoJson);
-        
+        // 命中兜底用的坐标缓存必须跟着清掉，否则还在拿上一张视图的旧边界算
+        if (typeof clearGeoCache === 'function') clearGeoCache();
+
         const features = geoJson.features.map(f => f.properties.name);
         const mapData = [];
-        
+
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
         const completedProvincesShort = allParsedData
           .map(item => provinceShortMap[item.rawProvince] || item.rawProvince)
           .filter(shortName => shortName !== undefined);
 
+        // 省内视图：按城市名匹配 done 数据里「不属于任何省」的条目（北京/上海这类直辖市也算城市）
+        if (isProvince) {
+          const provShortFilter = (name) => (provinceShortMap[name] || String(name).replace(/(省|市|自治区|特别行政区)/g, '')).trim();
+          const provinceFullName = (function () {
+            for (let key in provinceCodeMap) { if (String(provinceCodeMap[key]) === String(mapId)) return key; }
+            return '';
+          })();
+
+          features.forEach(featureName => {
+            const cityItems = allParsedData.filter(item => {
+              const itemRaw = String(item.rawProvince || '');
+              if (!itemRaw) return false;
+              const provOfItem = superCityMap[itemRaw.replace(/(市|自治州|地区|盟|县|区)$/, '')];
+              if (provOfItem && provinceFullName && provOfItem !== provinceFullName) return false;
+              if (itemRaw === featureName) return true;
+              const itemClean = itemRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              const fClean = String(featureName).replace(/(市|自治州|地区|盟|县|区)$/, '');
+              if (itemClean === fClean) return true;
+              return itemClean.length >= 2 && fClean.length >= 2 && (itemClean.includes(fClean) || fClean.includes(itemClean));
+            });
+            const isMunicipality = provShortFilter(featureName) === provShortFilter(provinceFullName);
+            if (cityItems.length || (isMunicipality && completedProvincesShort.includes(provShortFilter(featureName)))) {
+              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+              if (cityItems.length) provinceDataMap[featureName] = renderNodeHtml(cityItems);
+            }
+          });
+
+          myChart.hideLoading();
+          myChart.__hoverIndex = buildHoverIndex();
+          myChart.setOption({
+            tooltip: { show: false },
+            series: [{
+              type: 'map',
+              map: currentMapName,
+              roam: true,
+              zoom: 1.1,
+              label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return getTranslatedName(params.name); } },
+              itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
+              selectedMode: false,
+              emphasis: { itemStyle: { areaColor: 'inherit' } },
+              data: mapData
+            }]
+          }, true);
+
+          backBtn.style.display = 'block';
+          backBtn.innerText = t.back;
+          backBtn.onclick = () => renderMap(null, false);
+          return;
+        }
+
         features.forEach(featureName => {
           const featureShort = provinceShortMap[featureName] || featureName.replace(/(省|市|自治区|特别行政区)/g, '');
-          
-          if (!isProvince) {
-            if (completedProvincesShort.includes(featureShort) || completedProvincesShort.includes(featureName)) {
-              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-              // ★ 同一省份可能有多位作者的插件，全部显示（原来只取第一条）
+
+          if (completedProvincesShort.includes(featureShort) || completedProvincesShort.includes(featureName)) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
+            // ★ 同一省份可能有多位作者的插件，全部显示（原来只取第一条）
+            const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
+            if (provinceItems.length) {
+              provinceDataMap[featureName] = renderNodeHtml(provinceItems);
+            }
+          } else {
+            const hasCityCompleted = allParsedData.some(item => {
+              if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
+              const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
+              const prov = superCityMap[cleanName];
+              if (!prov) return false;
+              const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
+              return provShort === featureShort;
+            });
+
+            if (hasCityCompleted) {
+              // ★ 只做了部分城市（黄色）：仍然提示，但只列「整省」级别的条目；
+              //   各城市的条目留到下钻之后再显示，避免鼠标一放上去冒出一堆城市。
+              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(255, 190, 0, 0.6)' } });
               const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
               if (provinceItems.length) {
                 provinceDataMap[featureName] = renderNodeHtml(provinceItems);
               }
-            } else {
-              const cityItemTarget = new Map();
-              allParsedData.forEach(item => {
-                if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return;
-                const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
-                const prov = superCityMap[cleanName];
-                if (!prov) return;
-                const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
-                if (provShort !== featureShort) return;
-                cityItemTarget.set(item.rawProvince, (cityItemTarget.get(item.rawProvince) || []).concat([item]));
-              });
-
-              const hasCityCompleted = allParsedData.some(item => {
-                if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
-                const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
-                const prov = superCityMap[cleanName];
-                if (prov) {
-                  const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
-                  return provShort === featureShort;
-                }
-                return false;
-              });
-
-              if (hasCityCompleted) {
-                // ★ 只做了部分城市（黄色）：仍然提示，但只列「整省」级别的条目；
-                //   各城市的条目留到下钻之后再显示，避免鼠标一放上去冒出一堆城市。
-                mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(255, 190, 0, 0.6)' } });
-                const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
-                if (provinceItems.length) {
-                  provinceDataMap[featureName] = renderNodeHtml(provinceItems);
-                }
-              }
-            }
-          } else {
-            // ★ 同一城市的多个插件全部显示（原来只取第一条）
-            const cityItems = allParsedData.filter(item => {
-              const itemRaw = item.rawProvince;
-              const fRaw = featureName;
-              if (fRaw.includes('恩施') && itemRaw.includes('恩施')) return true;
-              const itemClean = itemRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
-              const fClean = fRaw.replace(/(市|自治州|地区|盟|县|区)$/, '');
-              return itemClean === fClean || itemClean.includes(fClean) || fClean.includes(itemClean);
-            });
-
-            if (cityItems.length) {
-              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-              provinceDataMap[featureName] = renderNodeHtml(cityItems);
             }
           }
         });
@@ -567,32 +603,39 @@
           tooltip: { show: false },
           series: [{
             type: 'map',
-            map: currentMapName, 
+            map: currentMapName,
             roam: true,
-            zoom: isProvince ? 1.1 : (isMobile ? 1.2 : 1.5),
-            center: isProvince ? undefined : [104, 36],
-            label: { 
-              show: true, 
-              fontSize: isMobile ? 7 : 10, 
+            zoom: isMobile ? 1.2 : 1.5,
+            center: [104, 36],
+            label: {
+              show: true,
+              fontSize: isMobile ? 7 : 10,
               color: '#333',
               formatter: function (params) {
                 return getTranslatedName(params.name);
               }
-            }, 
+            },
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
-            selectedMode: false, 
+            selectedMode: false,
             emphasis: { itemStyle: { areaColor: 'inherit' } },
             data: mapData
           }]
-        });
+        }, true);
 
-        backBtn.style.display = isProvince ? 'block' : 'none';
-        backBtn.innerText = isProvince ? t.back : t.backList; 
-        backBtn.onclick = isProvince ? () => renderMap(null, false) : () => window.location.href = '../scenery.html';
+        backBtn.style.display = 'none';
+        backBtn.innerText = t.backList;
+        backBtn.onclick = () => window.location.href = '../scenery.html';
 
       } catch (e) {
         console.error("地图加载失败", e);
         myChart.hideLoading();
+        if (mySeq === renderSeq) {
+          const tipEl = document.getElementById('loading-tip');
+          if (tipEl) {
+            tipEl.innerHTML = currentLang === 'zh' ? '地图数据加载失败，请刷新重试。' : 'Failed to load map data. Please refresh.';
+            tipEl.style.display = 'block';
+          }
+        }
       }
     }
 
@@ -621,8 +664,29 @@
 
     myChart.on('click', function (params) {
       const now = new Date().getTime();
-      const provinceName = params.name;
-      
+      const provinceName = params && (params.name || (params.data && params.data.name));
+
+      // ★ 已经在省图里：点哪个市就出那个市的卡片（手机端在底部弹出），不再尝试下钻
+      if (inProvinceView) {
+        if (touchOnly) {
+          const html = provinceName ? ((myChart.__hoverIndex || {})[normAreaName(provinceName)] || provinceDataMap[provinceName]) : '';
+          if (html) {
+            tooltipEl.innerHTML = html;
+            tooltipEl.style.display = 'block';
+            tooltipEl.style.transform = 'translateX(-50%)';
+            tooltipEl.style.left = '50%';
+            tooltipEl.style.top = 'auto';
+            tooltipEl.style.bottom = '50px';
+          } else {
+            hideTooltipNow();
+          }
+        }
+        lastClickTime = now;
+        lastClickName = provinceName;
+        return;
+      }
+
+      if (!provinceName) return;
       const cleanProvName = (provinceShortMap[provinceName] || provinceName.replace(/(省|市|自治区|特别行政区)/g, '')).trim();
       let canDrill = false;
       
@@ -702,7 +766,10 @@
         }
         return [out];
       }
-let cachedGeo = null;
+      let cachedGeo = null;
+      // 切换地图（全国 ↔ 某个省）后必须清掉，否则还在用上一张图的边界做命中判断
+      function clearGeoCache() { cachedGeo = null; }
+      window.clearGeoCache = clearGeoCache;
       function getDecodedGeo() {
         if (cachedGeo) return cachedGeo;
         const opt = myChart.getOption && myChart.getOption();
@@ -840,6 +907,33 @@ return null;
       holder.addEventListener('mouseleave', function () {
         if (!isOverBox) scheduleHide();
       });
+      // ★ 手机端：没有鼠标，全靠手指点。touchstart 记下坐标 → touchend 若没怎么移动就当作「点了一下」，
+      //   用自己的坐标判定点在哪个市。这样即使 ECharts 在省内视图没派发 click 也能出卡片。
+      let touchStartX = 0, touchStartY = 0, touchStartAt = 0;
+      holder.addEventListener('touchstart', function (e) {
+        const t0 = e.touches && e.touches[0];
+        if (!t0) return;
+        touchStartX = t0.clientX; touchStartY = t0.clientY; touchStartAt = Date.now();
+      }, { passive: true });
+      holder.addEventListener('touchend', function (e) {
+        if (!touchOnly) return;
+        const t1 = (e.changedTouches && e.changedTouches[0]) || null;
+        if (!t1) return;
+        if (Math.abs(t1.clientX - touchStartX) > 12 || Math.abs(t1.clientY - touchStartY) > 12) return;
+        if (Date.now() - touchStartAt > 800) return;
+        const rect = holder.getBoundingClientRect();
+        const name = pickByPoint(t1.clientX - rect.left, t1.clientY - rect.top);
+        if (!name) { hideTooltipNow(); return; }
+        const html = (myChart.__hoverIndex || {})[normAreaName(name)] || provinceDataMap[name];
+        if (!html) { hideTooltipNow(); return; }
+        currentHoverName = name;
+        tooltipEl.innerHTML = html;
+        tooltipEl.style.display = 'block';
+        tooltipEl.style.transform = 'translateX(-50%)';
+        tooltipEl.style.left = '50%';
+        tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px';
+      }, { passive: true });
     })();
 
     {
@@ -874,6 +968,14 @@ return null;
 
       tooltipEl.addEventListener('mouseleave', function () { isOverBox = false; hideTooltipNow(); });
     }
+
+    // ★ 手机端：手指点在卡片上不算「点到空白地图」，只在点卡片外面时才收起
+    document.addEventListener('touchstart', function (e) {
+      if (!touchOnly) return;
+      const t0 = e.target;
+      if (t0 && tooltipEl && (t0 === tooltipEl || tooltipEl.contains(t0))) return;
+      if (currentHoverName) hideTooltipNow();
+    }, { passive: true });
 
     window.addEventListener('resize', () => myChart.resize());
   </script>
