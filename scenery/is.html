@@ -525,6 +525,34 @@
       if (e.target === this) closeDetail();
     });
 
+    // ==================== 手机端：按下地点出卡片 ====================
+    // 冰岛整块只挂一条地景，没有 ECharts 的 hover；手机上用手指点一下地图就把卡片弹在底部。
+    // ★ 拖动手势（平移）/双指缩放不能误触发：位移小于 12px 且时间小于 800ms 才算「点了一下」。
+    (function () {
+      const mapEl = document.getElementById('map');
+      let tapAt = 0, tapX = 0, tapY = 0;
+      mapEl.addEventListener('touchstart', function (e) {
+        const t0 = e.touches && e.touches[0];
+        if (!t0) return;
+        tapAt = Date.now(); tapX = t0.clientX; tapY = t0.clientY;
+      }, { passive: true });
+      mapEl.addEventListener('touchend', function (e) {
+        const t1 = (e.changedTouches && e.changedTouches[0]) || null;
+        if (!t1) return;
+        if (Math.abs(t1.clientX - tapX) > 12 || Math.abs(t1.clientY - tapY) > 12) return;
+        if (Date.now() - tapAt > 800) return;
+        const html = (icelandData && icelandData.length) ? renderIcelandDetail(icelandData) : '';
+        if (!html) { hideTooltipNow(); return; }
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        tooltipEl.innerHTML = html;
+        tooltipEl.style.transform = 'translateX(-50%)';
+        tooltipEl.style.left = '50%';
+        tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px';
+        tooltipEl.style.display = 'block';
+      }, { passive: true });
+    })();
+
     window.addEventListener('resize', () => myChart.resize());
   </script>
 </body>
