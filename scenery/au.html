@@ -6,7 +6,14 @@
   <meta name="referrer" content="no-referrer" />
   <title>澳大利亚地景 - HorizonSimLabs</title>
   <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="../assets/echarts.min.js"></script>
+  <script>
+    // 站内 echarts 加载失败（文件缺失/被拦截）时再退回公共 CDN
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }

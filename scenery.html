@@ -6,11 +6,12 @@
   <meta name="referrer" content="no-referrer" />
   <title>全球地景 - HorizonSimLabs</title>
   <link rel="icon" href="HorizonSimLabs.png" type="image/png">
-  <!-- ★ 核心修复 1：ECharts 库双 CDN 容错 -->
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+  <!-- ECharts 优先用站内文件（手机网络访问 CDN 容易被拦导致整页空白） -->
+  <script src="./assets/echarts.min.js"></script>
   <script>
+    // 站内文件缺失时再退回公共 CDN
     if (typeof echarts === 'undefined') {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+      document.write('<script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"><\/script>');
     }
   </script>
   <style>

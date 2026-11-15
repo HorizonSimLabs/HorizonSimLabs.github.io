@@ -8,7 +8,14 @@
   <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
   
   <!-- 使用极速 CDN -->
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="../assets/echarts.min.js"></script>
+  <script>
+    // 站内 echarts 加载失败（文件缺失/被拦截）时再退回公共 CDN
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
   <script>
     if (typeof echarts === 'undefined') {
       document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');

@@ -6,7 +6,14 @@
   <meta name="referrer" content="no-referrer" />
   <title>中国地景 - HorizonSimLabs</title>
   <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
-  <script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"></script>
+    <script src="../assets/echarts.min.js"></script>
+  <script>
+    // 站内 echarts 加载失败（文件缺失/被拦截）时再退回公共 CDN
+    if (typeof echarts === 'undefined') {
+      document.write('<script src="https://unpkg.com/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+      document.write('<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/script>');
+    }
+  </script>
   <style>
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #f5f7fa; overflow: hidden; font-family: system-ui, sans-serif; }
     #map { width: 100%; height: 100%; }
@@ -77,8 +84,11 @@
     //   于是根本不注册 mouseover —— 鼠标放上去什么都不显示。现在只按 UA 判定。
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     // 鼠标当前位置（给悬停卡片定位兜底用）
-    const lastPointer = { x: 200, y: 200 };
-    window.addEventListener('mousemove', function (e) { lastPointer.x = e.clientX; lastPointer.y = e.clientY; }, { passive: true });
+    const lastPointer = { x: 200, y: 200, clientX: 200, clientY: 200 };
+    window.addEventListener('mousemove', function (e) { lastPointer.x = lastPointer.clientX = e.clientX; lastPointer.y = lastPointer.clientY = e.clientY; }, { passive: true });
+    // ★ 手机端没有 mousemove，手指点/滑时也要更新，卡片居中时不会跑到 (200,200)
+    window.addEventListener('touchstart', function (e) { const t = e.touches && e.touches[0]; if (t) { lastPointer.x = lastPointer.clientX = t.clientX; lastPointer.y = lastPointer.clientY = t.clientY; } }, { passive: true });
+    window.addEventListener('touchmove', function (e) { const t = e.touches && e.touches[0]; if (t) { lastPointer.x = lastPointer.clientX = t.clientX; lastPointer.y = lastPointer.clientY = t.clientY; } }, { passive: true });
 
     // 名字归一化：去首尾空格、全角空格、统一 NFC
 
@@ -480,6 +490,32 @@
       } catch (e) { console.error("读取数据失败", e); }
     }
 
+    // 阿里云把「南海诸岛」单独做成一个要素，adcode 以 _JD 结尾、name 为空字符串。
+    function isJDAdcode(v) { return /_JD$/i.test(String(v || '')); }
+
+    // ★ 去掉「南海诸岛」那个无名要素（只有省视图，全国视图保持原样）。
+    //   阿里云把南海诸岛做成了一个 adcode 以 _JD 结尾、name 为空字符串的要素，它里面混着
+    //   钓鱼岛、赤尾屿、马祖/东引、西沙/南沙这些图块，而且点进任何一个省都会跟着渲染，
+    //   于是每个省图上都挂着南海诸岛。这里在省视图里把它整个剔除：
+    //   海南真正的岛（西沙/南沙/东沙）属于「三沙市」这类有名字的要素，不依赖它，所以不会缺岛。
+    function stripJDGeoJson(geoJson, isProvince) {
+      if (!geoJson || !Array.isArray(geoJson.features)) return geoJson;
+      // 全国视图保持原样，国界线和南海诸岛照旧显示
+      if (!isProvince) return geoJson;
+      const out = geoJson.features.filter(function (f) {
+        // 阿里云省级数据里这个要素的 adcode 是 100000_JD、name 为空、只有 adchar 为 "JD"；
+        // 不同版本字段不完全一致，这几个特征任意命中一个就当作南海诸岛。
+        const p = (f && f.properties) || {};
+        if (isJDAdcode(p.adcode)) return false;
+        if (p.adchar && String(p.adchar).toUpperCase() === 'JD') return false;
+        const nm = String(p.name || '');
+        if (!nm.trim() || nm === 'undefined' || nm.indexOf('南海诸岛') >= 0) return false;
+        return true;
+      });
+      if (out.length !== geoJson.features.length) console.log('[cn] 省视图已移除南海诸岛要素');
+      return { type: 'FeatureCollection', features: out };
+    }
+
     async function renderMap(mapId = null, isProvince = false) {
       const t = i18n[currentLang];
       currentMapId = mapId;
@@ -494,8 +530,17 @@
 
         const res = await fetch(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
-        const geoJson = await res.json();
+        const rawGeoJson = await res.json();
         // 连续快速点击（全国 → 省 → 返回）时，只让最后一次请求的结果生效
+        if (mySeq !== renderSeq) return;
+
+        // ★ 省视图：阿里云会把「南海诸岛」那个要素和省级数据一起返回，点进任何一个省都会跟着画出来。
+        //   全国视图保留（国界完整），省视图整块去掉。
+        //   注意必须复制成新对象再注册：echarts.registerMap 会按地图名缓存，
+        //   直接改原对象在「全国 → 省」来回切换时会留下上一次的脏数据。
+        const geoJson = isProvince
+          ? stripJDGeoJson({ type: 'FeatureCollection', features: (rawGeoJson.features || []).slice() }, true)
+          : rawGeoJson;
         if (mySeq !== renderSeq) return;
 
         // ★ 地图注册名固定：省图和全国图共用 'china'。
@@ -508,6 +553,10 @@
 
         const features = geoJson.features.map(f => f.properties.name);
         const mapData = [];
+
+        // ★ 省视图里有些要素本身画了一张「南海诸岛小地图插画」（方框 + 几块碎岛 + 名字标签），
+        //   这不是真正的行政区，从 series 数据里点名禁掉，连带它的标签一起不显示。
+        const suppressNames = isProvince ? ['undefined', '南海诸岛'] : [];
 
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
@@ -524,6 +573,7 @@
           })();
 
           features.forEach(featureName => {
+            if (featureName === undefined || featureName === null) return;
             const cityItems = allParsedData.filter(item => {
               const itemRaw = String(item.rawProvince || '');
               if (!itemRaw) return false;
@@ -544,6 +594,10 @@
 
           myChart.hideLoading();
           myChart.__hoverIndex = buildHoverIndex();
+          // 禁掉南海诸岛那块的标签和填充
+          suppressNames.forEach(function (nm) {
+            mapData.push({ name: nm, itemStyle: { areaColor: 'transparent', borderColor: 'transparent', opacity: 0 }, label: { show: false }, emphasis: { disabled: true, label: { show: false }, itemStyle: { areaColor: 'transparent', borderColor: 'transparent', opacity: 0 } } });
+          });
           myChart.setOption({
             tooltip: { show: false },
             series: [{
@@ -551,7 +605,7 @@
               map: currentMapName,
               roam: true,
               zoom: 1.1,
-              label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return getTranslatedName(params.name); } },
+              label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return suppressNames.indexOf(params.name) >= 0 ? '' : getTranslatedName(params.name); } },
               itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
               selectedMode: false,
               emphasis: { itemStyle: { areaColor: 'inherit' } },
@@ -662,71 +716,71 @@
     let lastClickTime = 0;
     let lastClickName = '';
 
+    // ★ 把「出卡片」统一成一个函数：手机端固定贴在底部居中，电脑端跟在区块旁边
+    function showCardFor(name) {
+      if (!name) return false;
+      const html = (myChart.__hoverIndex || {})[normAreaName(name)] || provinceDataMap[name];
+      if (!html) return false;
+      currentHoverName = name;
+      tooltipEl.innerHTML = html;
+      tooltipEl.style.display = 'block';
+      if (isMobile) {
+        tooltipEl.style.transform = 'translateX(-50%)';
+        tooltipEl.style.left = '50%';
+        tooltipEl.style.top = 'auto';
+        tooltipEl.style.bottom = '50px';
+      } else {
+        placeTooltipAt();
+      }
+      return true;
+    }
+
+    // 找出某个省对应的阿里云 adcode（省级），找不到返回 null
+    function mapIdOfProvince(provinceName) {
+      const cleanProvName = (provinceShortMap[provinceName] || String(provinceName).replace(/(省|市|自治区|特别行政区)/g, '')).trim();
+      for (let key in provinceCodeMap) {
+        const shortKey = (provinceShortMap[key] || key.replace(/(省|市|自治区)/g, '')).trim();
+        if (shortKey === cleanProvName) return provinceCodeMap[key];
+      }
+      return null;
+    }
+    function canDrillProvince(provinceName) {
+      const cleanProvName = (provinceShortMap[provinceName] || String(provinceName).replace(/(省|市|自治区|特别行政区)/g, '')).trim();
+      for (let prov of allowedDrillProvinces) {
+        const pShort = (provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '')).trim();
+        if (pShort === cleanProvName) return true;
+      }
+      return false;
+    }
+
     myChart.on('click', function (params) {
       const now = new Date().getTime();
       const provinceName = params && (params.name || (params.data && params.data.name));
+      if (!provinceName) return;
 
       // ★ 已经在省图里：点哪个市就出那个市的卡片（手机端在底部弹出），不再尝试下钻
       if (inProvinceView) {
-        if (touchOnly) {
-          const html = provinceName ? ((myChart.__hoverIndex || {})[normAreaName(provinceName)] || provinceDataMap[provinceName]) : '';
-          if (html) {
-            tooltipEl.innerHTML = html;
-            tooltipEl.style.display = 'block';
-            tooltipEl.style.transform = 'translateX(-50%)';
-            tooltipEl.style.left = '50%';
-            tooltipEl.style.top = 'auto';
-            tooltipEl.style.bottom = '50px';
-          } else {
-            hideTooltipNow();
-          }
-        }
+        if (!showCardFor(provinceName) && isMobile) hideTooltipNow();
         lastClickTime = now;
         lastClickName = provinceName;
         return;
       }
 
       if (!provinceName) return;
-      const cleanProvName = (provinceShortMap[provinceName] || provinceName.replace(/(省|市|自治区|特别行政区)/g, '')).trim();
-      let canDrill = false;
-      
-      for (let prov of allowedDrillProvinces) {
-        const pShort = (provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '')).trim();
-        if (pShort === cleanProvName) {
-          canDrill = true;
-          break;
-        }
-      }
 
-      // 有下级城市地景才允许下钻：桌面端单击、手机端双击（避免单击出卡片又跳走）
-      if (canDrill) {
+      // ★ 手机端没有 hover：第一次点先把卡片弹出来，再点同一个省份才下钻进去。
+      //   之前是「有下级城市的省单击只等下钻」，手机上就完全没有反馈，看着像点不动。
+      if (touchOnly) {
+        handleAreaTap(provinceName);
+        return;
+      }
+      // 电脑端：有下级城市地景的省单击直接下钻（保持原行为）
+      if (canDrillProvince(provinceName)) {
         lastDrillTime = new Date().getTime();
-        const isDouble = (now - lastClickTime < 300 && lastClickName === provinceName);
-        if (!touchOnly || isDouble) {
-          let mapId = null;
-          for (let key in provinceCodeMap) {
-            const shortKey = (provinceShortMap[key] || key.replace(/(省|市|自治区)/g, '')).trim();
-            if (shortKey === cleanProvName) {
-              mapId = provinceCodeMap[key];
-              break;
-            }
-          }
-          if (mapId) {
-            tooltipEl.style.display = 'none';
-            renderMap(mapId, true);
-          }
-        }
-      } else if (touchOnly) {
-        // 手机端单击：有卡片就显示在底部，没有就收起
-        if (provinceDataMap[provinceName]) {
-          tooltipEl.innerHTML = provinceDataMap[provinceName];
-          tooltipEl.style.display = 'block';
-          tooltipEl.style.left = '50%';
-          tooltipEl.style.top = 'auto';
-          tooltipEl.style.bottom = '50px';
-          tooltipEl.style.transform = 'translateX(-50%)';
-        } else {
+        const mapId = mapIdOfProvince(provinceName);
+        if (mapId) {
           tooltipEl.style.display = 'none';
+          renderMap(mapId, true);
         }
       }
       lastClickTime = now;
@@ -735,15 +789,48 @@
 
     myChart.getZr().on('click', function (event) {
       if (touchOnly && !event.target) {
-        tooltipEl.style.display = 'none';
+        hideTooltipNow();
+        flightName = '';
       }
     });
+
+    // ★ 手指点地图时统一走这里（ECharts 的 click 与 touch 兜底共用）：
+    //   省内 → 点哪个市弹哪个市的卡片；全国 → 第一次点弹卡片，再点同一个省下钻。
+    function handleAreaTap(name) {
+      const now = Date.now();
+      if (inProvinceView) {
+        if (!showCardFor(name) && isMobile) hideTooltipNow();
+        return;
+      }
+      if (canDrillProvince(name)) {
+        const mapId = mapIdOfProvince(name);
+        if (mapId && flightName === name && now - lastClickTime < 4000) {
+          flightName = '';
+          hideTooltipNow();
+          renderMap(mapId, true);
+          return;
+        }
+        showCardFor(name);
+        flightName = mapId ? name : '';
+        lastClickTime = now;
+        lastClickName = name;
+        return;
+      }
+      showCardFor(name);
+      flightName = '';
+    }
 
     // ★ 悬停卡片一律注册：之前用 `if (!isMobile)` 判断，触屏笔记本/触摸屏一体机会被当成手机，
     //   鼠标放上去什么都不显示。手机端的「点击弹卡片」改用指针类型判断（touchOnly）。
     let touchOnly = false;
     try { touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches; } catch (e) { touchOnly = false; }
+    // ★ 有些手机的浏览器会报 any-pointer: fine（例如带触控笔、或厂商 UA 被改写），
+    //   只要 UA 明显是手机就按触屏处理，否则手机上点击永远走电脑端分支、看不到卡片。
+    if (!touchOnly && isMobile) touchOnly = true;
+    if (touchOnly) document.documentElement.classList.add('is-touch');
     let isOverBox = false; let hideTimer = null; let currentHoverName = null;
+    // 手机上「已经点开过卡片、再点一次就要下钻」的省份
+    let flightName = '';
     // ★ 兜底：鼠标停在地图上但 ECharts 没发 mouseover 时（停在边框上、标签上、或色块边缘），
     //   用自己的坐标 → 经纬度 → 包含该点的要素来查卡片。这是「鼠标放上去没反应」的最后一道保险。
     (function () {
@@ -924,15 +1011,8 @@ return null;
         const rect = holder.getBoundingClientRect();
         const name = pickByPoint(t1.clientX - rect.left, t1.clientY - rect.top);
         if (!name) { hideTooltipNow(); return; }
-        const html = (myChart.__hoverIndex || {})[normAreaName(name)] || provinceDataMap[name];
-        if (!html) { hideTooltipNow(); return; }
-        currentHoverName = name;
-        tooltipEl.innerHTML = html;
-        tooltipEl.style.display = 'block';
-        tooltipEl.style.transform = 'translateX(-50%)';
-        tooltipEl.style.left = '50%';
-        tooltipEl.style.top = 'auto';
-        tooltipEl.style.bottom = '50px';
+        // 与 ECharts 的 click 走同一套规则（第一次点出卡片、再点同一个省下钻）
+        handleAreaTap(name);
       }, { passive: true });
     })();
 
