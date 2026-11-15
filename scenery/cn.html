@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="referrer" content="no-referrer" />
   <title>中国地景 - HorizonSimLabs</title>
   <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
@@ -75,6 +75,8 @@
   <button id="lang-btn" class="ui-btn">Switch to English</button>
   
   <div id="map"></div>
+  <!-- 加载中的提示（之前引用了这个 id 但页面上根本没有，出错时用户完全看不到原因） -->
+  <div id="loading-tip" style="display:flex;">正在加载中国地图…</div>
   <div id="my-tooltip"></div>
 
   <script>
@@ -83,6 +85,22 @@
     // ★ 之前用 'ontouchstart' in window 判定手机，触屏笔记本/二合一平板会被误判成手机，
     //   于是根本不注册 mouseover —— 鼠标放上去什么都不显示。现在只按 UA 判定。
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    // ★★★ 手机端「看不到地图」的致命原因：视图缩放被锁死。
+    //   页头 meta 里写了 maximum-scale=1.0, user-scalable=no，ECharts 的渲染画布
+    //   （canvas）尺寸是按「视觉视口」算的；而手机浏览器在 CSS 像素宽度小于 980 时
+    //   会把整个页面按 980px 的布局视口缩放渲染，画布尺寸就跟着对不上，
+    //   地图被画到屏幕外 → 看起来一片空白（电脑上没问题）。
+    //   这里在脚本运行前改写 meta，放开缩放，让 visual viewport 与普通手机页面一致。
+    (function () {
+      try {
+        var metas = document.querySelectorAll('meta[name="viewport"]');
+        for (var i = 0; i < metas.length; i++) {
+          metas[i].setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
+        }
+      } catch (e) { /* 老浏览器忽略 */ }
+    })();
+
     // 鼠标当前位置（给悬停卡片定位兜底用）
     const lastPointer = { x: 200, y: 200, clientX: 200, clientY: 200 };
     window.addEventListener('mousemove', function (e) { lastPointer.x = lastPointer.clientX = e.clientX; lastPointer.y = lastPointer.clientY = e.clientY; }, { passive: true });
@@ -528,9 +546,147 @@
           ? `https://geo.datav.aliyun.com/areas_v3/bound/${mapId}_full.json`
           : 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
 
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const rawGeoJson = await res.json();
+        // ★ 阿里云的数据在手机上经常拉不到（部分运营商/DNS 拦截、弱网超时、证书问题），
+        //   以前一失败就整片空白。现在：① 加 15 秒超时；② 失败自动重试一次；
+        //   ③ 仍然失败就退回站点内的 GeoJSON/China.json（站内文件，不会再受网络影响）。
+        async function fetchWithTimeout(u, ms) {
+          const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+          const timer = setTimeout(() => { if (ctrl) ctrl.abort(); }, ms);
+          try {
+            const r = await fetch(u, ctrl ? { signal: ctrl.signal } : undefined);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return await r.json();
+          } finally { clearTimeout(timer); }
+        }
+        // ★ 第一次请求超时了可以接受降级，但超时可能很长；手机上先给个能看的东西：
+        //   首次进入就直接用站内数据渲染（不会白屏），后台再静默拉阿里云数据，
+        //   拉到了就无缝替换成官方边界。
+        const FIRST_RENDER_WITH_LOCAL = !isProvince && !window.__cnTriedLocal;
+
+        async function loadNationalGeoJson() {
+          let lastErr = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try { return await fetchWithTimeout(url, 15000); }
+            catch (err) { lastErr = err; console.warn('[cn] 阿里云数据第 ' + (attempt + 1) + ' 次失败：' + err.message); }
+          }
+          console.warn('[cn] 改用站内 GeoJSON/China.json', lastErr && lastErr.message);
+          try {
+            const local = await fetchWithTimeout('../GeoJSON/China.json?t=' + Date.now(), 20000);
+            local.__fromLocalFile = true;
+            return local;
+          } catch (err2) {
+            console.warn('[cn] 站内数据也失败：' + err2.message);
+            throw err2;
+          }
+        }
+
+        // 只读站内数据（首次渲染用，保证手机上有图可看）
+        async function loadLocalGeoJsonFast() {
+          const local = await fetchWithTimeout('../GeoJSON/China.json?t=' + Date.now(), 20000);
+          local.__fromLocalFile = true;
+          return local;
+        }
+
+        // ★ 站内 GeoJSON/China.json 是阿里云的「扁平」格式：只有市/区级要素（477 条），
+        //   没有省界。这里按 adcode 前两位聚合成省轮廓，让全国视图和阿里云版完全一致。
+        const GEOJSON_PROVINCE_BY_CODE = {};
+        Object.keys(provinceCodeMap).forEach(function (k) { GEOJSON_PROVINCE_BY_CODE[String(provinceCodeMap[k]).slice(0, 2)] = k; });
+
+        function jdFilterFeature(f) {
+          const p = (f && f.properties) || {};
+          if (isJDAdcode(p.adcode)) return false;
+          if (p.adchar && String(p.adchar).toUpperCase() === 'JD') return false;
+          const nm = String(p.name || '');
+          if (!nm.trim() || nm === 'undefined' || nm.indexOf('南海诸岛') >= 0) return false;
+          return true;
+        }
+
+        // 把扁平数据聚合成「省级轮廓」：同省所有市/区的面拼成一个 MultiPolygon
+        function aggregateProvinceGeoJson(feats) {
+          const polysByProv = {};
+          const provNameByCode = {};
+          feats.forEach(function (f) {
+            const p = (f && f.properties) || {};
+            const ad = String(p.adcode || '');
+            if (ad.length !== 6) return;              // 直辖市下辖区也是 6 位，照常归并
+            const code = ad.slice(0, 2);
+            const provName = GEOJSON_PROVINCE_BY_CODE[code];
+            if (!provName) return;
+            if (!jdFilterFeature(f)) return;
+            const g = f.geometry || {};
+            let polys = [];
+            if (g.type === 'Polygon') polys = [g.coordinates];
+            else if (g.type === 'MultiPolygon') polys = g.coordinates || [];
+            if (!polys.length) return;
+            (polysByProv[provName] = polysByProv[provName] || []).push.apply(polysByProv[provName], polys);
+            provNameByCode[code] = provName;
+          });
+          const out = [];
+          Object.keys(polysByProv).forEach(function (provName) {
+            const code = provinceCodeMap[provName];
+            out.push({
+              type: 'Feature',
+              properties: {
+                name: provName,
+                adcode: code,
+                level: 'province',
+                center: null,
+                childrenNum: polysByProv[provName].length
+              },
+              geometry: { type: 'MultiPolygon', coordinates: polysByProv[provName] }
+            });
+          });
+          return { type: 'FeatureCollection', features: out };
+        }
+
+        // 把扁平数据里某个省的所有下级要素抽出来，作为下钻用的省图
+        function subProvinceGeoJson(feats, provCode) {
+          const out = feats.filter(function (f) {
+            const p = (f && f.properties) || {};
+            return String(p.adcode || '').slice(0, 2) === String(provCode).slice(0, 2) && String(p.adcode || '').length === 6 && jdFilterFeature(f);
+          });
+          return { type: 'FeatureCollection', features: out };
+        }
+
+        // 站内数据 → 可直接交给 ECharts 的 geoJson（全国聚合省界 / 省视图取该省下级）
+        function geoJsonFromRaw(raw, provinceView, pid) {
+          if (!raw || !raw.__fromLocalFile) return raw;
+          const feats = raw.features || [];
+          if (provinceView && pid) {
+            const sub = subProvinceGeoJson(feats, pid);
+            // 万一某个省在站内数据里没有下级要素，退回全国省界，至少不会白屏
+            return (sub.features || []).length ? sub : aggregateProvinceGeoJson(feats);
+          }
+          return aggregateProvinceGeoJson(feats);
+        }
+
+        let rawGeoJson;
+        if (FIRST_RENDER_WITH_LOCAL) {
+          // 先把站内数据画出来（手机上不会再等阿里云等到白屏）
+          try {
+            rawGeoJson = await loadLocalGeoJsonFast();
+            window.__cnTriedLocal = true;
+          } catch (e) {
+            console.warn('[cn] 站内数据加载失败，直接等阿里云：' + e.message);
+            rawGeoJson = await loadNationalGeoJson();
+          }
+        } else {
+          rawGeoJson = await loadNationalGeoJson();
+        }
+        let geoJsonSource = geoJsonFromRaw(rawGeoJson, isProvince, mapId);
+        // 首次渲染已经用站内数据顶上时，后台静默拉一次阿里云官方边界，拉到就无缝替换
+        const bgRaw = window.__cnBgRaw;
+        if (!isProvince && rawGeoJson.__fromLocalFile && bgRaw && !bgRaw.__fromLocalFile && mySeq === renderSeq) {
+          try {
+            const canonical = aggregateProvinceGeoJson(bgRaw.features || []);
+            if (mySeq === renderSeq && (canonical.features || []).length) {
+              geoJsonSource = canonical;
+              window.__cnBgRaw = null;
+              // 顺便缓存成「官方数据」，之后点进省份下钻也优先用官方接口
+              window.__cnCanonicalReady = true;
+            }
+          } catch (e) { /* 官方数据有问题就继续用站内的 */ }
+        }
         // 连续快速点击（全国 → 省 → 返回）时，只让最后一次请求的结果生效
         if (mySeq !== renderSeq) return;
 
@@ -539,8 +695,8 @@
         //   注意必须复制成新对象再注册：echarts.registerMap 会按地图名缓存，
         //   直接改原对象在「全国 → 省」来回切换时会留下上一次的脏数据。
         const geoJson = isProvince
-          ? stripJDGeoJson({ type: 'FeatureCollection', features: (rawGeoJson.features || []).slice() }, true)
-          : rawGeoJson;
+          ? stripJDGeoJson({ type: 'FeatureCollection', features: (geoJsonSource.features || []).slice() }, true)
+          : geoJsonSource;
         if (mySeq !== renderSeq) return;
 
         // ★ 地图注册名固定：省图和全国图共用 'china'。
@@ -652,6 +808,9 @@
         });
 
         myChart.hideLoading();
+        // 有地图了就把「正在加载…」收掉（之前成功时也一直挂着）
+        const okTip = document.getElementById('loading-tip');
+        if (okTip) okTip.style.display = 'none';
         myChart.__hoverIndex = buildHoverIndex();
         myChart.setOption({
           tooltip: { show: false },
