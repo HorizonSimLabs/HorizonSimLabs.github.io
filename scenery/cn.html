@@ -82,27 +82,21 @@
   <script>
     const tooltipEl = document.getElementById('my-tooltip');
     const backBtn = document.getElementById('back-btn');
-    // ★ 之前用 'ontouchstart' in window 判定手机，触屏笔记本/二合一平板会被误判成手机，
-    //   于是根本不注册 mouseover —— 鼠标放上去什么都不显示。现在只按 UA 判定。
+    // ★ 只按 UA 判定手机：用 'ontouchstart' in window 会把触屏笔记本误判成手机
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-    // ★★★ 手机端「看不到地图」的致命原因：视图缩放被锁死。
-    //   页头 meta 里写了 maximum-scale=1.0, user-scalable=no，ECharts 的渲染画布
-    //   （canvas）尺寸是按「视觉视口」算的；而手机浏览器在 CSS 像素宽度小于 980 时
-    //   会把整个页面按 980px 的布局视口缩放渲染，画布尺寸就跟着对不上，
-    //   地图被画到屏幕外 → 看起来一片空白（电脑上没问题）。
-    //   这里在脚本运行前改写 meta，放开缩放，让 visual viewport 与普通手机页面一致。
+    // ★ 视图缩放：手机上 maximum-scale=1.0/user-scalable=no 会让 ECharts 画布按 980px 布局视口算，
+    //   地图被画到屏幕外。这里在脚本运行前把 meta 改回 device-width。
     (function () {
       try {
         var metas = document.querySelectorAll('meta[name="viewport"]');
         for (var i = 0; i < metas.length; i++) {
           metas[i].setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
         }
-      } catch (e) { /* 老浏览器忽略 */ }
+      } catch (e) { }
     })();
 
-    // ★★★ 手机上「有 Switch to English、却没有正在加载中国地图…」说明脚本确实跑起来了，
-    //   但提示层被挡住/被裁掉了。这里直接把加载提示做成浅色胶囊，保证在任何背景上都看得见。
+    // 加载提示做成浅色胶囊，保证任何背景上都看得见
     (function () {
       try {
         var tip = document.getElementById('loading-tip');
@@ -126,18 +120,13 @@
       } catch (e) { }
     })();
 
-    // 鼠标当前位置（给悬停卡片定位兜底用）
+    // 鼠标/手指当前位置（卡片定位兜底）
     const lastPointer = { x: 200, y: 200, clientX: 200, clientY: 200 };
     window.addEventListener('mousemove', function (e) { lastPointer.x = lastPointer.clientX = e.clientX; lastPointer.y = lastPointer.clientY = e.clientY; }, { passive: true });
-    // ★ 手机端没有 mousemove，手指点/滑时也要更新，卡片居中时不会跑到 (200,200)
     window.addEventListener('touchstart', function (e) { const t = e.touches && e.touches[0]; if (t) { lastPointer.x = lastPointer.clientX = t.clientX; lastPointer.y = lastPointer.clientY = t.clientY; } }, { passive: true });
     window.addEventListener('touchmove', function (e) { const t = e.touches && e.touches[0]; if (t) { lastPointer.x = lastPointer.clientX = t.clientX; lastPointer.y = lastPointer.clientY = t.clientY; } }, { passive: true });
 
-    // 名字归一化：去首尾空格、全角空格、统一 NFC
-
-
-
-    // 卡片要显示在「当前鼠标悬停的区块」旁边（按悬停点算位置，不跟鼠标移动）
+    // ==================== 悬停卡片 ====================
     let hoverAnchor = null;
     function rememberMouse(x, y) {
       if (!isFinite(x) || !isFinite(y)) return;
@@ -154,7 +143,6 @@
       const w = tooltipEl.offsetWidth || 360;
       const h = tooltipEl.offsetHeight || 200;
       const gap = 10;
-      // 默认放在鼠标右侧；右边放不下就翻到左边；上下夹在可视区内（顶部留出按钮高度）
       let x = cx + 24;
       if (x + w > window.innerWidth - 8) x = cx - w - 24;
       if (x < 8) x = Math.max(8, Math.min(cx - w / 2, window.innerWidth - w - 8));
@@ -165,45 +153,41 @@
       tooltipEl.style.left = x + 'px';
       tooltipEl.style.top = y + 'px';
     }
-    // ★ 是否还停在同一个区块上：鼠标从绿色区域挪向卡片时会路过没地景的地方，
-    //   这段时间不能把卡片关掉，否则来不及把鼠标放上去。
+
+    // ★ 鼠标从区块挪向卡片时会路过空白处，这段时间不能关卡片
+    let hideTimer = null;
+    let isOverBox = false;
+    let currentHoverName = null;
     let lastInsideAt = 0;
-    const HIDE_DELAY_MS = 1600;
+    const HIDE_DELAY_MS = 400;
     function hideTooltipNow() {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
-      lastInsideAt = 0;
+      clearTimeout(hideTimer); hideTimer = null;
       tooltipEl.style.display = 'none';
       currentHoverName = null;
       tooltipEl.__areaName = '';
-      tooltipEl.nameAttr = '';
     }
     function scheduleHide() {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (hideTimer) return;
       hideTimer = setTimeout(function () {
         hideTimer = null;
-        // 计时结束时鼠标若回到了区块上、或已经停在卡片上，就继续显示
         if (isOverBox) return;
-        if (Date.now() - lastInsideAt < HIDE_DELAY_MS - 50) return;
         hideTooltipNow();
       }, HIDE_DELAY_MS);
     }
     function keepTooltip() {
-      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      clearTimeout(hideTimer); hideTimer = null;
       lastInsideAt = Date.now();
     }
-    function normAreaName(n) {
-      let s = String(n || '').replace(/[\u00a0\u3000]/g, ' ').trim();
-      try { if (s.normalize) s = s.normalize('NFC'); } catch (e) { }
-      return s;
-    }
-    // 把 provinceDataMap 里所有卡片按归一化名字登记一份，悬停时直接查
+    function normAreaName(n) { return String(n == null ? '' : n).replace(/\s+/g, '').replace(/\u3000/g, '').normalize ? String(n == null ? '' : n).replace(/\s+/g, '').replace(/\u3000/g, '').normalize('NFC') : String(n == null ? '' : n).replace(/\s+/g, ''); }
     function buildHoverIndex() {
       const idx = {};
-      Object.keys(provinceDataMap || {}).forEach(function (k) { idx[normAreaName(k)] = provinceDataMap[k]; });
+      for (let k in provinceDataMap) {
+        idx[normAreaName(k)] = provinceDataMap[k];
+      }
       return idx;
     }
-    let currentLang = 'zh';
 
+    let currentLang = 'zh';
     const i18n = {
       zh: {
         back: "← 返回全国", backList: "← 返回全球", author: "作者：", download: "下载方式：",
@@ -410,50 +394,6 @@
     }
 
 
-    // ★ 初始化时必须用显式尺寸：手机上脚本执行时页面还在布局，容器 clientWidth 可能是 0，
-    //   ECharts 会按 0 建画布，之后又不会自己 resize → 整页看着就是空白。
-    //   所以这里量一次容器，拿不到就退回 window.innerWidth/Height，后续再多时机 fitMap()。
-    const mapHolder = document.getElementById('map');
-    function holderSize() {
-      const w = mapHolder.clientWidth || window.innerWidth || 0;
-      const h = mapHolder.clientHeight || window.innerHeight || 0;
-      return { w: w, h: h };
-    }
-    const __initSize = holderSize();
-    const myChart = echarts.init(mapHolder, null, {
-      width: __initSize.w || undefined,
-      height: __initSize.h || undefined,
-      devicePixelRatio: window.devicePixelRatio || 1
-    });
-
-    // 容器尺寸变了就重新量一次并 resize（手机第一次布局完成、转屏、输入法弹出都会走到这里）
-    function fitMap() {
-      try {
-        if (!myChart) return;
-        myChart.resize();
-      } catch (e) { }
-    }
-    window.addEventListener('resize', fitMap);
-    window.addEventListener('orientationchange', function () { setTimeout(fitMap, 120); });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) fitMap(); });
-    [0, 60, 200, 500, 1000, 2000].forEach(function (ms) { setTimeout(fitMap, ms); });
-    // 容器尺寸真的变化时才触发（避免死循环）
-    var __lastW = 0, __lastH = 0;
-    if (window.ResizeObserver) {
-      try {
-        new ResizeObserver(function () {
-          var s = holderSize();
-          if (!s.w || !s.h) return;
-          if (Math.abs(s.w - __lastW) < 2 && Math.abs(s.h - __lastH) < 2) return;
-          __lastW = s.w; __lastH = s.h;
-          fitMap();
-        }).observe(mapHolder);
-      } catch (e) { }
-    }
-
-
-
-
     // ==================== 地景数据：Cloudflare D1 接口 ====================
     // 数据源已从静态文件 done.json 换成 D1（Cloudflare Worker + D1 scenery 表）。
     // 接口返回 { ok: true, count, data: [{ rawProvince, author, freeLink, freeLevel, paidLink, paidLevel, remark }] }
@@ -573,30 +513,37 @@
       } catch (e) { console.error("读取数据失败", e); }
     }
 
-    // 阿里云把「南海诸岛」单独做成一个要素，adcode 以 _JD 结尾、name 为空字符串。
-    function isJDAdcode(v) { return /_JD$/i.test(String(v || '')); }
 
-    // ★ 去掉「南海诸岛」那个无名要素（只有省视图，全国视图保持原样）。
-    //   阿里云把南海诸岛做成了一个 adcode 以 _JD 结尾、name 为空字符串的要素，它里面混着
-    //   钓鱼岛、赤尾屿、马祖/东引、西沙/南沙这些图块，而且点进任何一个省都会跟着渲染，
-    //   于是每个省图上都挂着南海诸岛。这里在省视图里把它整个剔除：
-    //   海南真正的岛（西沙/南沙/东沙）属于「三沙市」这类有名字的要素，不依赖它，所以不会缺岛。
-    function stripJDGeoJson(geoJson, isProvince) {
-      if (!geoJson || !Array.isArray(geoJson.features)) return geoJson;
-      // 全国视图保持原样，国界线和南海诸岛照旧显示
-      if (!isProvince) return geoJson;
-      const out = geoJson.features.filter(function (f) {
-        // 阿里云省级数据里这个要素的 adcode 是 100000_JD、name 为空、只有 adchar 为 "JD"；
-        // 不同版本字段不完全一致，这几个特征任意命中一个就当作南海诸岛。
-        const p = (f && f.properties) || {};
-        if (isJDAdcode(p.adcode)) return false;
-        if (p.adchar && String(p.adchar).toUpperCase() === 'JD') return false;
-        const nm = String(p.name || '');
-        if (!nm.trim() || nm === 'undefined' || nm.indexOf('南海诸岛') >= 0) return false;
-        return true;
-      });
-      if (out.length !== geoJson.features.length) console.log('[cn] 省视图已移除南海诸岛要素');
-      return { type: 'FeatureCollection', features: out };
+    // ==================== 地图 ====================
+    // ★ 全国视图只用「省级行政区」边界（assets/china-provinces.json，从阿里云 100000_full.json
+    //   剪出来的 34 个省级要素）。以前是把 GeoJSON/China.json 里 477 个市/区面拼成省，
+    //   拼出来的省界是碎块、还会出现「省内分裂」，所以改成这份规整的省级边界。
+    //   省视图（下钻）仍走阿里云的 `${adcode}_full.json`（那里只有该省的下级行政区，
+    //   不含南海诸岛那块插画）。
+    const CHINA_PROVINCES_URL = '../assets/china-provinces.json';
+    let chinaProvincesGeo = null;
+
+    async function loadProvinceGeo() {
+      if (chinaProvincesGeo) return chinaProvincesGeo;
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
+      try {
+        const r = await fetch(CHINA_PROVINCES_URL, ctrl ? { signal: ctrl.signal } : undefined);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        chinaProvincesGeo = await r.json();
+        return chinaProvincesGeo;
+      } finally { clearTimeout(timer); }
+    }
+
+    // 省视图数据：阿里云 ${adcode}_full.json（15 秒超时）
+    async function loadSubProvinceGeo(mapId) {
+      const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
+      try {
+        const r = await fetch('https://geo.datav.aliyun.com/areas_v3/bound/' + mapId + '_full.json', ctrl ? { signal: ctrl.signal } : undefined);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return await r.json();
+      } finally { clearTimeout(timer); }
     }
 
     async function renderMap(mapId = null, isProvince = false) {
@@ -607,246 +554,15 @@
       myChart.showLoading();
 
       try {
-        const url = isProvince && mapId
-          ? `https://geo.datav.aliyun.com/areas_v3/bound/${mapId}_full.json`
-          : 'https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json';
-
-        // ★ 阿里云的数据在手机上经常拉不到（部分运营商/DNS 拦截、弱网超时、证书问题），
-        //   以前一失败就整片空白。现在：① 加 15 秒超时；② 失败自动重试一次；
-        //   ③ 仍然失败就退回站点内的 GeoJSON/China.json（站内文件，不会再受网络影响）。
-        async function fetchWithTimeout(u, ms) {
-          const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
-          const timer = setTimeout(() => { if (ctrl) ctrl.abort(); }, ms);
-          try {
-            const r = await fetch(u, ctrl ? { signal: ctrl.signal } : undefined);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return await r.json();
-          } finally { clearTimeout(timer); }
-        }
-        // ★ 第一次请求超时了可以接受降级，但超时可能很长；手机上先给个能看的东西：
-        //   首次进入就直接用站内数据渲染（不会白屏），后台再静默拉阿里云数据，
-        //   拉到了就无缝替换成官方边界。
-        const FIRST_RENDER_WITH_LOCAL = !isProvince && !window.__cnTriedLocal;
-
-        async function loadNationalGeoJson() {
-          let lastErr = null;
-          for (let attempt = 0; attempt < 2; attempt++) {
-            try { return await fetchWithTimeout(url, 15000); }
-            catch (err) { lastErr = err; console.warn('[cn] 阿里云数据第 ' + (attempt + 1) + ' 次失败：' + err.message); }
-          }
-          console.warn('[cn] 改用站内 GeoJSON/China.json', lastErr && lastErr.message);
-          try {
-            const local = await fetchWithTimeout('../GeoJSON/China.json?t=' + Date.now(), 20000);
-            local.__fromLocalFile = true;
-            return local;
-          } catch (err2) {
-            console.warn('[cn] 站内数据也失败：' + err2.message);
-            throw err2;
-          }
-        }
-
-        // 只读站内数据（首次渲染用，保证手机上有图可看）
-        async function loadLocalGeoJsonFast() {
-          const local = await fetchWithTimeout('../GeoJSON/China.json?t=' + Date.now(), 20000);
-          local.__fromLocalFile = true;
-          return local;
-        }
-
-        // ★ 站内 GeoJSON/China.json 是阿里云的「扁平」格式：只有市/区级要素（477 条），
-        //   没有省界。下面按 adcode 前两位把它们聚合成省轮廓。
-        //
-        //   ⚠️ 关键：阿里云的多面要素里，「第一个面是外轮廓，后面几个面其实是洞（飞地/被别的市围住的
-        //   小市）」，例如顺义区、吉林市、东营市、许昌市……。如果直接把所有面当成独立多边形拼到
-        //   省里，洞就会变成实心块，省图上就会出现「一块块被挖空/分裂」的观感（电脑端也一样）。
-        //   所以这里把「落在本要素外轮廓里的面」还原成洞：MultiPolygon 的第二个及以后的环。
-        const GEOJSON_PROVINCE_BY_CODE = {};
-        Object.keys(provinceCodeMap).forEach(function (k) { GEOJSON_PROVINCE_BY_CODE[String(provinceCodeMap[k]).slice(0, 2)] = k; });
-
-        function jdFilterFeature(f) {
-          const p = (f && f.properties) || {};
-          if (isJDAdcode(p.adcode)) return false;
-          if (p.adchar && String(p.adchar).toUpperCase() === 'JD') return false;
-          const nm = String(p.name || '');
-          if (!nm.trim() || nm === 'undefined' || nm.indexOf('南海诸岛') >= 0) return false;
-          return true;
-        }
-
-        function ringBBoxLocal(ring) {
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-          for (let i = 0; i < ring.length; i++) {
-            const p = ring[i];
-            if (p[0] < minX) minX = p[0];
-            if (p[0] > maxX) maxX = p[0];
-            if (p[1] < minY) minY = p[1];
-            if (p[1] > maxY) maxY = p[1];
-          }
-          return [minX, minY, maxX, maxY];
-        }
-        function pointInRingLocal(pt, ring) {
-          let inside = false;
-          for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-            const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
-            if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) inside = !inside;
-          }
-          return inside;
-        }
-        // 把扁平数据聚合成「省级轮廓」：同省所有市/区的面拼成一个 MultiPolygon（洞保留为内环）
-        //
-        // ⚠️ 阿里云这套数据的多面要素里，凡是被「别的行政区」完整包住的面（同一个市内部的 enclave，
-        //   或者被相邻市包住的飞地，例如朝阳区在顺义区里、武汉市在黄冈市里、吉林市在长春市里），
-        //   直接拼接会出现「一块块被挖空/分裂」的花屏。所以先在全省范围内算一次包含关系，
-        //   把被包住的面还原成外轮廓的内环（洞）。
-        function ringContainsPoint(ring, pt) {
-          const bb = ringBBoxLocal(ring);
-          if (pt[0] < bb[0] || pt[0] > bb[2] || pt[1] < bb[1] || pt[1] > bb[3]) return false;
-          return pointInRingLocal(pt, ring);
-        }
-        function aggregateProvinceGeoJson(feats) {
-          const provFeatures = {};
-          feats.forEach(function (f) {
-            const p = (f && f.properties) || {};
-            const ad = String(p.adcode || '');
-            if (ad.length !== 6) return;              // 直辖市下辖区也是 6 位，照常归并
-            const provName = GEOJSON_PROVINCE_BY_CODE[ad.slice(0, 2)];
-            if (!provName) return;
-            if (!jdFilterFeature(f)) return;
-            (provFeatures[provName] = provFeatures[provName] || []).push(f);
-          });
-
-          const out = [];
-          Object.keys(provFeatures).forEach(function (provName) {
-            // 收集本省所有面
-            const polys = [];      // { rings: [ring...], outer: ring }
-            provFeatures[provName].forEach(function (f) {
-              const g = f.geometry || {};
-              const rawPolys = g.type === 'Polygon' ? [g.coordinates]
-                : (g.type === 'MultiPolygon' ? (g.coordinates || []) : []);
-              rawPolys.forEach(function (rings) {
-                if (!rings || !rings.length) return;
-                const outer = rings[0];
-                if (!outer || !outer.length) return;
-                polys.push({ rings: rings.slice(), outer: outer });
-              });
-            });
-
-            // 每个面检查是否被「面积更大/点更多」的别的面完整包住 → 变成那个面内环
-            const holesOf = polys.map(function () { return []; });
-            for (let i = 0; i < polys.length; i++) {
-              const a = polys[i];
-              const pt = a.outer[0];
-              let best = -1, bestLen = 0;
-              for (let j = 0; j < polys.length; j++) {
-                if (i === j) continue;
-                const b = polys[j];
-                const bl = b.outer.length;
-                if (bl <= bestLen) continue;
-                if (!ringContainsPoint(b.outer, pt)) continue;
-                best = j; bestLen = bl;
-              }
-              if (best >= 0) holesOf[best].push(i);
-            }
-            const holeSet = {};
-            holesOf.forEach(function (list) { list.forEach(function (hi) { holeSet[hi] = true; }); });
-
-            const outPolys = [];
-            for (let i = 0; i < polys.length; i++) {
-              if (holeSet[i]) continue;
-              const rings = polys[i].rings.slice();
-              holesOf[i].forEach(function (hi) {
-                polys[hi].rings.forEach(function (hr) { if (hr && hr.length) rings.push(hr); });
-              });
-              outPolys.push(rings);
-            }
-
-            out.push({
-              type: 'Feature',
-              properties: {
-                name: provName,
-                adcode: provinceCodeMap[provName],
-                level: 'province',
-                center: null,
-                childrenNum: outPolys.length
-              },
-              geometry: { type: 'MultiPolygon', coordinates: outPolys }
-            });
-          });
-          return { type: 'FeatureCollection', features: out };
-        }
-
-        // 把扁平数据里某个省的所有下级要素抽出来，作为下钻用的省图
-        function subProvinceGeoJson(feats, provCode) {
-          const out = feats.filter(function (f) {
-            const p = (f && f.properties) || {};
-            return String(p.adcode || '').slice(0, 2) === String(provCode).slice(0, 2) && String(p.adcode || '').length === 6 && jdFilterFeature(f);
-          });
-          return { type: 'FeatureCollection', features: out };
-        }
-
-        // 站内数据 → 可直接交给 ECharts 的 geoJson（全国聚合省界 / 省视图取该省下级）
-        function geoJsonFromRaw(raw, provinceView, pid) {
-          if (!raw || !raw.__fromLocalFile) return raw;
-          const feats = raw.features || [];
-          if (provinceView && pid) {
-            const sub = subProvinceGeoJson(feats, pid);
-            // 万一某个省在站内数据里没有下级要素，退回全国省界，至少不会白屏
-            return (sub.features || []).length ? sub : aggregateProvinceGeoJson(feats);
-          }
-          return aggregateProvinceGeoJson(feats);
-        }
-
-        let rawGeoJson;
-        if (FIRST_RENDER_WITH_LOCAL) {
-          // 先把站内数据画出来（手机上不会再等阿里云等到白屏）
-          try {
-            rawGeoJson = await loadLocalGeoJsonFast();
-            window.__cnTriedLocal = true;
-          } catch (e) {
-            console.warn('[cn] 站内数据加载失败，直接等阿里云：' + e.message);
-            rawGeoJson = await loadNationalGeoJson();
-          }
-        } else {
-          rawGeoJson = await loadNationalGeoJson();
-        }
-        let geoJsonSource = geoJsonFromRaw(rawGeoJson, isProvince, mapId);
-        // 首次渲染已经用站内数据顶上时，后台静默拉一次阿里云官方边界，拉到就无缝替换
-        const bgRaw = window.__cnBgRaw;
-        if (!isProvince && rawGeoJson.__fromLocalFile && bgRaw && !bgRaw.__fromLocalFile && mySeq === renderSeq) {
-          try {
-            const canonical = aggregateProvinceGeoJson(bgRaw.features || []);
-            if (mySeq === renderSeq && (canonical.features || []).length) {
-              geoJsonSource = canonical;
-              window.__cnBgRaw = null;
-              // 顺便缓存成「官方数据」，之后点进省份下钻也优先用官方接口
-              window.__cnCanonicalReady = true;
-            }
-          } catch (e) { /* 官方数据有问题就继续用站内的 */ }
-        }
-        // 连续快速点击（全国 → 省 → 返回）时，只让最后一次请求的结果生效
+        const geoJson = isProvince && mapId ? await loadSubProvinceGeo(mapId) : await loadProvinceGeo();
         if (mySeq !== renderSeq) return;
 
-        // ★ 省视图：阿里云会把「南海诸岛」那个要素和省级数据一起返回，点进任何一个省都会跟着画出来。
-        //   全国视图保留（国界完整），省视图整块去掉。
-        //   注意必须复制成新对象再注册：echarts.registerMap 会按地图名缓存，
-        //   直接改原对象在「全国 → 省」来回切换时会留下上一次的脏数据。
-        const geoJson = isProvince
-          ? stripJDGeoJson({ type: 'FeatureCollection', features: (geoJsonSource.features || []).slice() }, true)
-          : geoJsonSource;
-        if (mySeq !== renderSeq) return;
-
-        // ★ 地图注册名固定：省图和全国图共用 'china'。
-        //   之前用 map_${mapId} 生成新名字，ECharts 会把标了数据的新 map 当成「换地图」，
-        //   连同 hover/click 命中一起失效，导致省内各市既点不动也不出卡片。
+        // 地图注册名固定 'china'：换名会让 ECharts 把它当成「换地图」，hover/click 一起失效
         const currentMapName = 'china';
         echarts.registerMap(currentMapName, geoJson);
-        // 命中兜底用的坐标缓存必须跟着清掉，否则还在拿上一张视图的旧边界算
-        if (typeof clearGeoCache === 'function') clearGeoCache();
 
-        const features = geoJson.features.map(f => f.properties.name);
+        const features = (geoJson.features || []).map(f => (f.properties || {}).name).filter(n => n != null);
         const mapData = [];
-
-        // ★ 省视图里有些要素本身画了一张「南海诸岛小地图插画」（方框 + 几块碎岛 + 名字标签），
-        //   这不是真正的行政区，从 series 数据里点名禁掉，连带它的标签一起不显示。
-        const suppressNames = isProvince ? ['undefined', '南海诸岛'] : [];
 
         for (let key in provinceDataMap) { delete provinceDataMap[key]; }
 
@@ -854,7 +570,7 @@
           .map(item => provinceShortMap[item.rawProvince] || item.rawProvince)
           .filter(shortName => shortName !== undefined);
 
-        // 省内视图：按城市名匹配 done 数据里「不属于任何省」的条目（北京/上海这类直辖市也算城市）
+        // ---------- 省视图：点哪个市出哪个市的卡片 ----------
         if (isProvince) {
           const provShortFilter = (name) => (provinceShortMap[name] || String(name).replace(/(省|市|自治区|特别行政区)/g, '')).trim();
           const provinceFullName = (function () {
@@ -863,7 +579,6 @@
           })();
 
           features.forEach(featureName => {
-            if (featureName === undefined || featureName === null) return;
             const cityItems = allParsedData.filter(item => {
               const itemRaw = String(item.rawProvince || '');
               if (!itemRaw) return false;
@@ -884,24 +599,17 @@
 
           myChart.hideLoading();
           myChart.__hoverIndex = buildHoverIndex();
-          // 禁掉南海诸岛那块的标签和填充
-          suppressNames.forEach(function (nm) {
-            mapData.push({ name: nm, itemStyle: { areaColor: 'transparent', borderColor: 'transparent', opacity: 0 }, label: { show: false }, emphasis: { disabled: true, label: { show: false }, itemStyle: { areaColor: 'transparent', borderColor: 'transparent', opacity: 0 } } });
-          });
           myChart.setOption({
             tooltip: { show: false },
             series: [{
               type: 'map',
               map: currentMapName,
               roam: true,
-              // ★ 布局用「占满容器 + 按容器比例适配」，不要只靠 zoom 死撑：
-              //   手机上竖屏容器又高又窄，默认 1:0.75 的 aspect 加上 zoom 1.1 会把省图挤成一条
-              //   偏在角落里的小块（甚至会跑到可视区域之外），controller 上看起来就是「没地图」。
               layoutCenter: ['50%', '50%'],
               layoutSize: '96%',
               aspectScale: 0.9,
               zoom: isMobile ? 1 : 1.1,
-              label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return suppressNames.indexOf(params.name) >= 0 ? '' : getTranslatedName(params.name); } },
+              label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return getTranslatedName(params.name); } },
               itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
               selectedMode: false,
               emphasis: { itemStyle: { areaColor: 'inherit' } },
@@ -909,56 +617,51 @@
             }]
           }, true);
 
+          const okTipS = document.getElementById('loading-tip');
+          if (okTipS) okTipS.style.display = 'none';
           backBtn.style.display = 'block';
           backBtn.innerText = t.back;
           backBtn.onclick = () => renderMap(null, false);
           return;
         }
 
+        // ---------- 全国视图：整省点亮 / 有下级城市则标黄 ----------
         features.forEach(featureName => {
           const featureShort = provinceShortMap[featureName] || featureName.replace(/(省|市|自治区|特别行政区)/g, '');
 
           if (completedProvincesShort.includes(featureShort) || completedProvincesShort.includes(featureName)) {
             mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(0, 180, 100, 0.6)' } });
-            // ★ 同一省份可能有多位作者的插件，全部显示（原来只取第一条）
             const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
-            if (provinceItems.length) {
-              provinceDataMap[featureName] = renderNodeHtml(provinceItems);
-            }
-          } else {
-            const hasCityCompleted = allParsedData.some(item => {
-              if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
-              const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
-              const prov = superCityMap[cleanName];
-              if (!prov) return false;
-              const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
-              return provShort === featureShort;
-            });
+            if (provinceItems.length) provinceDataMap[featureName] = renderNodeHtml(provinceItems);
+            return;
+          }
 
-            if (hasCityCompleted) {
-              // ★ 只做了部分城市（黄色）：仍然提示，但只列「整省」级别的条目；
-              //   各城市的条目留到下钻之后再显示，避免鼠标一放上去冒出一堆城市。
-              mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(255, 190, 0, 0.6)' } });
-              const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
-              if (provinceItems.length) {
-                provinceDataMap[featureName] = renderNodeHtml(provinceItems);
-              }
-            }
+          const hasCityCompleted = allParsedData.some(item => {
+            if (provinceShortMap[item.rawProvince] || provinceCodeMap[item.rawProvince]) return false;
+            const cleanName = item.rawProvince.replace(/(市|自治州|地区|盟|县|区)$/, '');
+            const prov = superCityMap[cleanName];
+            if (!prov) return false;
+            const provShort = provinceShortMap[prov] || prov.replace(/(省|市|自治区)/g, '');
+            return provShort === featureShort;
+          });
+
+          if (hasCityCompleted) {
+            mapData.push({ name: featureName, itemStyle: { areaColor: 'rgba(255, 190, 0, 0.6)' } });
+            const provinceItems = allParsedData.filter(item => item.rawProvince === featureShort || item.rawProvince === featureName);
+            if (provinceItems.length) provinceDataMap[featureName] = renderNodeHtml(provinceItems);
           }
         });
 
         myChart.hideLoading();
-        // 有地图了就把「正在加载…」收掉（之前成功时也一直挂着）
+        myChart.__hoverIndex = buildHoverIndex();
         const okTip = document.getElementById('loading-tip');
         if (okTip) okTip.style.display = 'none';
-        myChart.__hoverIndex = buildHoverIndex();
         myChart.setOption({
           tooltip: { show: false },
           series: [{
             type: 'map',
             map: currentMapName,
             roam: true,
-            // ★ 同省视图：占满容器并按容器比例适配（手机竖屏才不会把地图甩到可视区外）
             layoutCenter: ['50%', '50%'],
             layoutSize: '96%',
             aspectScale: 0.9,
@@ -968,9 +671,7 @@
               show: true,
               fontSize: isMobile ? 7 : 10,
               color: '#333',
-              formatter: function (params) {
-                return getTranslatedName(params.name);
-              }
+              formatter: function (params) { return getTranslatedName(params.name); }
             },
             itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
             selectedMode: false,
@@ -984,12 +685,12 @@
         backBtn.onclick = () => window.location.href = '../scenery.html';
 
       } catch (e) {
-        console.error("地图加载失败", e);
+        console.error('地图加载失败', e);
         myChart.hideLoading();
         if (mySeq === renderSeq) {
           const tipEl = document.getElementById('loading-tip');
           if (tipEl) {
-            tipEl.innerHTML = currentLang === 'zh' ? '地图数据加载失败，请刷新重试。' : 'Failed to load map data. Please refresh.';
+            tipEl.innerHTML = currentLang === 'zh' ? ('地图数据加载失败：' + (e && e.message ? e.message : e)) : ('Failed to load map data: ' + (e && e.message ? e.message : e));
             tipEl.style.display = 'block';
           }
         }
@@ -1001,12 +702,49 @@
       backBtn.innerText = i18n[currentLang].backList;
     }
 
+    // ==================== 地图容器 ====================
+    // ★ 手机上脚本执行时页面还在布局，容器 clientWidth 可能是 0，ECharts 会按 0 建画布，
+    //   之后又不会自己 resize → 整页空白。所以显式量尺寸，拿不到就退回 window 尺寸。
+    const mapHolder = document.getElementById('map');
+    function holderSize() {
+      const w = mapHolder.clientWidth || window.innerWidth || 0;
+      const h = mapHolder.clientHeight || window.innerHeight || 0;
+      return { w: w, h: h };
+    }
+    const __initSize = holderSize();
+    const myChart = echarts.init(mapHolder, null, {
+      width: __initSize.w || undefined,
+      height: __initSize.h || undefined,
+      devicePixelRatio: window.devicePixelRatio || 1
+    });
+
+    function fitMap() {
+      try { if (myChart) myChart.resize(); } catch (e) { }
+    }
+    window.addEventListener('resize', fitMap);
+    window.addEventListener('orientationchange', function () { setTimeout(fitMap, 120); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) fitMap(); });
+    [0, 60, 200, 500, 1000, 2000].forEach(function (ms) { setTimeout(fitMap, ms); });
+    var __lastW = 0, __lastH = 0;
+    if (window.ResizeObserver) {
+      try {
+        new ResizeObserver(function () {
+          var sz = holderSize();
+          if (!sz.w || !sz.h) return;
+          if (Math.abs(sz.w - __lastW) < 2 && Math.abs(sz.h - __lastH) < 2) return;
+          __lastW = sz.w; __lastH = sz.h;
+          fitMap();
+        }).observe(mapHolder);
+      } catch (e) { }
+    }
+
+
     async function initApp() {
       updateUI();
       try {
         await fetchData();
       } catch (e) {
-        // 数据（D1 接口 + done.json）都挂了也不能让地图一起消失：先记日志，照常画地图
+        // 数据（D1 接口 + done.json）都挂了也不能让地图一起消失
         console.error('数据加载失败', e);
       }
       try {
@@ -1015,7 +753,7 @@
         console.error('地图渲染失败', e);
         const tipEl = document.getElementById('loading-tip');
         if (tipEl) {
-          tipEl.innerHTML = currentLang === 'zh' ? ('地图渲染失败：' + (e && e.message ? e.message : e)) : ('Map render failed: ' + (e && e.message ? e.message : e));
+          tipEl.innerHTML = '地图渲染失败：' + (e && e.message ? e.message : e);
           tipEl.style.display = 'block';
         }
       }
@@ -1026,7 +764,7 @@
     document.getElementById('lang-btn').addEventListener('click', async () => {
       currentLang = currentLang === 'zh' ? 'en' : 'zh';
       updateUI();
-      await fetchData();
+      try { await fetchData(); } catch (e) { console.error(e); }
       await renderMap(currentMapId, currentMapId !== null);
     });
 
@@ -1052,6 +790,7 @@
       return true;
     }
 
+
     // 找出某个省对应的阿里云 adcode（省级），找不到返回 null
     function mapIdOfProvince(provinceName) {
       const cleanProvName = (provinceShortMap[provinceName] || String(provinceName).replace(/(省|市|自治区|特别行政区)/g, '')).trim();
@@ -1070,12 +809,13 @@
       return false;
     }
 
+
+    // ==================== 点击 ====================
     myChart.on('click', function (params) {
       const now = new Date().getTime();
       const provinceName = params && (params.name || (params.data && params.data.name));
       if (!provinceName) return;
 
-      // ★ 已经在省图里：点哪个市就出那个市的卡片（手机端在底部弹出），不再尝试下钻
       if (inProvinceView) {
         if (!showCardFor(provinceName) && isMobile) hideTooltipNow();
         lastClickTime = now;
@@ -1083,206 +823,105 @@
         return;
       }
 
-      if (!provinceName) return;
-
-      // ★ 手机端没有 hover：第一次点先把卡片弹出来，再点同一个省份才下钻进去。
-      //   之前是「有下级城市的省单击只等下钻」，手机上就完全没有反馈，看着像点不动。
       if (touchOnly) {
         handleAreaTap(provinceName);
         return;
       }
-      // 电脑端：有下级城市地景的省单击直接下钻（保持原行为）
       if (canDrillProvince(provinceName)) {
         lastDrillTime = new Date().getTime();
         const mapId = mapIdOfProvince(provinceName);
         if (mapId) {
           tooltipEl.style.display = 'none';
-          renderMap(mapId, true);
+          currentHoverName = null;
+          setTimeout(function () { renderMap(mapId, true); }, 260);
+          return;
         }
       }
+      showCardFor(provinceName);
       lastClickTime = now;
       lastClickName = provinceName;
     });
 
-    myChart.getZr().on('click', function (event) {
-      if (touchOnly && !event.target) {
-        hideTooltipNow();
-        flightName = '';
-      }
-    });
-
-    // ★ 手指点地图时统一走这里（ECharts 的 click 与 touch 兜底共用）：
-    //   省内 → 点哪个市弹哪个市的卡片；全国 → 第一次点弹卡片，再点同一个省下钻。
+    let lastDrillTime = 0;
+    // ★ 手机端：没有 hover。第一次点出卡片；再点同一个省（4 秒内）才下钻
+    let flightName = '';
+    let lastTapAt = 0;
     function handleAreaTap(name) {
+      if (!name) return;
       const now = Date.now();
-      if (inProvinceView) {
-        if (!showCardFor(name) && isMobile) hideTooltipNow();
-        return;
-      }
-      if (canDrillProvince(name)) {
+      if (inProvinceView) { showCardFor(name); return; }
+      if (flightName === name && now - lastTapAt < 4000 && canDrillProvince(name)) {
         const mapId = mapIdOfProvince(name);
-        if (mapId && flightName === name && now - lastClickTime < 4000) {
-          flightName = '';
-          hideTooltipNow();
-          renderMap(mapId, true);
-          return;
-        }
-        showCardFor(name);
-        flightName = mapId ? name : '';
-        lastClickTime = now;
-        lastClickName = name;
-        return;
+        if (mapId) { flightName = ''; hideTooltipNow(); setTimeout(function () { renderMap(mapId, true); }, 60); return; }
       }
+      flightName = name;
+      lastTapAt = now;
       showCardFor(name);
-      flightName = '';
     }
 
-    // ★ 悬停卡片一律注册：之前用 `if (!isMobile)` 判断，触屏笔记本/触摸屏一体机会被当成手机，
-    //   鼠标放上去什么都不显示。手机端的「点击弹卡片」改用指针类型判断（touchOnly）。
+    // ==================== 命中兜底（ECharts 没派发事件时按坐标找区块）====================
     let touchOnly = false;
     try { touchOnly = window.matchMedia('(hover: none) and (pointer: coarse)').matches && !window.matchMedia('(any-pointer: fine)').matches; } catch (e) { touchOnly = false; }
-    // ★ 有些手机的浏览器会报 any-pointer: fine（例如带触控笔、或厂商 UA 被改写），
-    //   只要 UA 明显是手机就按触屏处理，否则手机上点击永远走电脑端分支、看不到卡片。
     if (!touchOnly && isMobile) touchOnly = true;
-    if (touchOnly) document.documentElement.classList.add('is-touch');
-    let isOverBox = false; let hideTimer = null; let currentHoverName = null;
-    // 手机上「已经点开过卡片、再点一次就要下钻」的省份
-    let flightName = '';
-    // ★ 兜底：鼠标停在地图上但 ECharts 没发 mouseover 时（停在边框上、标签上、或色块边缘），
-    //   用自己的坐标 → 经纬度 → 包含该点的要素来查卡片。这是「鼠标放上去没反应」的最后一道保险。
-    (function () {
-      let raf = 0;
-// GeoJSON/ 里是 ECharts 压缩格式（UTF8Encoding:true），环是字符串而不是点数组。
-      // ECharts 自己 internals 会解，但这里拿到的 geoJSON 仍可能是原样字符串，必须现场解一次。
-      function polyRings(poly) {
-        if (!poly || !poly.length) return [];
-        if (Array.isArray(poly[0])) return poly;      // 已经是点数组
-        // 单个压缩环 → 解成点数组
-        const s = poly;
-        const out = [];
-        let x = 0, y = 0;
-        for (let i = 0; i + 1 < s.length; i += 2) {
-          const nx = s.charCodeAt(i) - 64, ny = s.charCodeAt(i + 1) - 64;
-          x += (nx >> 1) ^ (-(nx & 1));
-          y += (ny >> 1) ^ (-(ny & 1));
-          if (x === 0 && y === 0) break;
-          out.push([x / 1024, y / 1024]);
-        }
-        return [out];
-      }
-      let cachedGeo = null;
-      // 切换地图（全国 ↔ 某个省）后必须清掉，否则还在用上一张图的边界做命中判断
-      function clearGeoCache() { cachedGeo = null; }
-      window.clearGeoCache = clearGeoCache;
-      function getDecodedGeo() {
-        if (cachedGeo) return cachedGeo;
-        const opt = myChart.getOption && myChart.getOption();
-        const mapName = opt && opt.series && opt.series[0] && opt.series[0].map;
-        if (!mapName || !echarts.getMap) return null;
-        const mapObj = echarts.getMap(mapName);
-        const raw = mapObj && (mapObj.geoJSON || mapObj.geoJson);
-        if (!raw || !raw.features) return null;
-        // 页面自己有 decodeGeoJson（丹麦/马来西亚等）就复用，保证解码口径一致
-        try {
-          if (typeof decodeGeoJson === 'function' && raw.UTF8Encoding !== false) {
-            const d = decodeGeoJson(raw);
-            if (d && d.features && d.features[0] && d.features[0].geometry && Array.isArray(d.features[0].geometry.coordinates)) { cachedGeo = d; return d; }
-          }
-        } catch (e) { /* 走下面的兜底解码 */ }
-        cachedGeo = { type: 'FeatureCollection', features: raw.features.map(function (f) { return { type: 'Feature', properties: f.properties || {}, geometry: { type: f.geometry.type, coordinates: decodePolys(f.geometry) } }; }) };
-        return cachedGeo;
-      }
-      function ringPoints(s, off) {
-        if (Array.isArray(s)) return s;
-        let x = 0, y = 0, i = 0;
-        if (typeof s !== 'string') return [];
-        // 官方格式：首两字符是 64+首点x、64+首点y
-        if (s.charCodeAt(0) === 64 && s.length > 2) {
-          x = s.charCodeAt(1) - 64;
-          y = s.charCodeAt(2) - 64;
-          i = 3;
-        }
-        if (Array.isArray(off) && off.length === 2) { x = off[0]; y = off[1]; }
-        const out = [];
-        for (; i + 1 < s.length; i += 2) {
-          const nx = s.charCodeAt(i) - 64, ny = s.charCodeAt(i + 1) - 64;
-          x += (nx >> 1) ^ (-(nx & 1));
-          y += (ny >> 1) ^ (-(ny & 1));
-          if (x === 0 && y === 0) break;
-          out.push([x / 1024, y / 1024]);
-        }
-        return out;
-      }
-      // 返回 [[环,[环]...], ...]：外环 + 洞
-      function decodePolys(g) {
-        const offs = g.encodeOffsets || null;
-        function normRing(node, off) {
-          if (typeof node === 'string') return [ringPoints(node, off)];
-          if (Array.isArray(node) && node.length && typeof node[0] === 'string') return [ringPoints(node[0], Array.isArray(off) ? off[0] : null)];
-          return [];
-        }
-        const isStr = v => typeof v === 'string';
-        const isPt = v => Array.isArray(v) && v.length >= 2 && typeof v[0] === 'number';
-        function walk(node, off, acc) {
-          if (isStr(node)) { acc.push(ringPoints(node, off)); return; }
-          if (!Array.isArray(node)) return;
-          if (node.length && node.every(p => Array.isArray(p) && typeof p[0] === 'number' && typeof p[1] === 'number')) { acc.push(node); return; }
-          const flatStr = node.every(x => isStr(x));
-          if (flatStr) {
-            node.forEach((s, i) => acc.push(ringPoints(s, Array.isArray(off) && Array.isArray(off[i]) ? off[i] : null)));
-            return;
-          }
-          node.forEach((child, i) => walk(child, Array.isArray(off) ? off[i] : null, acc));
-        }
-        const rings = [];
-        walk(g.coordinates, offs, rings);
-        return rings.filter(r => r && r.length > 2);
-      }
-      function pickByPoint(px, py) {
-        const geo = getDecodedGeo();
-        if (!geo) return null;
+    document.documentElement.classList.add('is-touch');
+
+    // ★ 坐标 → 区域名：直接问 ECharts 当前激活的地图，不再自己维护一份解码缓存
+    function pickByPoint(px, py) {
+      try {
         const pt = myChart.convertFromPixel({ seriesIndex: 0 }, [px, py]);
         if (!pt || !isFinite(pt[0]) || !isFinite(pt[1])) return null;
+        const mapObj = echarts.getMap ? echarts.getMap('china') : null;
+        const raw = mapObj && (mapObj.geoJSON || mapObj.geoJson);
+        if (!raw || !raw.features) return null;
         const lng = pt[0], lat = pt[1];
-        // ★ 多岛国家（澳大利亚/日本/新西兰等）的要素由很多个多边形拼成，
-        //   直接用「第一个环=外环、其余环=洞」的判定会漏掉大半国土（例如新南威尔士的主岛），
-        //   这里改成「命中任意一个环就算在里面」，多个要素同时命中就取面积最小的那个（飞地更具体）。
-        let bestName = null, bestRatio = -1;
-        for (let i = 0; i < geo.features.length; i++) {
-          const f2 = geo.features[i];
-          const g2 = f2 && f2.geometry;
-          const nm2 = f2 && f2.properties && f2.properties.name;
-          if (!g2 || !nm2 || !Array.isArray(g2.coordinates)) continue;
-          let hit = false;
-          for (let ri = 0; ri < g2.coordinates.length; ri++) {
-            const ring = g2.coordinates[ri];
-            if (!ring || ring.length < 3) continue;
-            let inside2 = false;
-            for (let ci = 0, cj = ring.length - 1; ci < ring.length; cj = ci++) {
-              const xi = ring[ci][0], yi = ring[ci][1];
-              const xj = ring[cj][0], yj = ring[cj][1];
-              if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / ((yj - yi) || 1e-12) + xi)) inside2 = !inside2;
-            }
-            if (inside2) hit = true;
-          }
-          if (!hit) continue;
-          // 用要素包围盒对角线的倒数当「大小」，越小越具体
-          const bb = (f2.__bb || (f2.__bb = (function () {
-            let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
-            g2.coordinates.forEach(function (r) { r.forEach(function (q) { if (q[0] < x0) x0 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[0] > x1) x1 = q[0]; if (q[1] > y1) y1 = q[1]; }); });
-            return [x0, y0, x1, y1];
-          })()));
-          const size = Math.sqrt((bb[2] - bb[0]) ** 2 + (bb[3] - bb[1]) ** 2) || 1;
-          const ratio = 1 / size;
-          if (ratio > bestRatio) { bestRatio = ratio; bestName = nm2; }
-        }
-        if (bestName) return bestName;
-return null;
+        let bestName = null, bestArea = Infinity;
+        raw.features.forEach(function (f2) {
+          const nm2 = f2.properties && f2.properties.name;
+          if (!nm2) return;
+          const hit = pointInFeature(lng, lat, f2.geometry);
+          if (!hit) return;
+          if (hit < bestArea) { bestArea = hit; bestName = nm2; }
+        });
+        return bestName;
+      } catch (e) { return null; }
+    }
+    function pointInRingXY(lng, lat, ring) {
+      let inside2 = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+        if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside2 = !inside2;
       }
+      return inside2;
+    }
+    function pointInFeature(lng, lat, g) {
+      if (!g || !g.coordinates) return 0;
+      if (typeof g.coordinates[0] === 'string') return 0;   // 压缩格式兜底由 ECharts 负责
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+      let x0 = Infinity, y0 = Infinity, size = 0;
+      for (let pi = 0; pi < polys.length; pi++) {
+        const rings = polys[pi];
+        if (!rings || !rings.length) continue;
+        if (!pointInRingXY(lng, lat, rings[0])) continue;
+        let inHole = false;
+        for (let ri = 1; ri < rings.length; ri++) {
+          if (pointInRingXY(lng, lat, rings[ri])) { inHole = true; break; }
+        }
+        if (inHole) continue;
+        for (let ri = 0; ri < rings[0].length; ri++) {
+          const p = rings[0][ri];
+          if (p[0] < x0) x0 = p[0];
+          if (p[1] < y0) y0 = p[1];
+          size += 1;
+        }
+      }
+      return size ? (size + Math.abs(x0)) : 0;
+    }
+
+    (function () {
       const holder = document.getElementById('map');
       if (!holder) return;
+      let raf = 0;
       holder.addEventListener('mousemove', function (e) {
-        // 卡片位置固定，不跟鼠标移动；这里只负责记录锚点、维持「还在区块上」的状态
         lastPointer && Object.assign(lastPointer, { clientX: e.clientX, clientY: e.clientY, x: e.clientX, y: e.clientY });
         if (!currentHoverName) rememberMouse(e.clientX, e.clientY);
         if (raf) return;
@@ -1297,22 +936,20 @@ return null;
             if (currentHoverName !== name || tooltipEl.style.display !== 'block') {
               currentHoverName = name;
               tooltipEl.__areaName = name;
-              tooltipEl.nameAttr = name;
               tooltipEl.innerHTML = html;
               rememberMouse(e.clientX, e.clientY);
               placeTooltipAt();
             }
             return;
           }
-          // 鼠标不在任何地景区块上：若卡片还开着，给足够时间让鼠标挪到卡片上
           if (currentHoverName && !hideTimer) scheduleHide();
         });
       }, { passive: true });
       holder.addEventListener('mouseleave', function () {
         if (!isOverBox) scheduleHide();
       });
-      // ★ 手机端：没有鼠标，全靠手指点。touchstart 记下坐标 → touchend 若没怎么移动就当作「点了一下」，
-      //   用自己的坐标判定点在哪个市。这样即使 ECharts 在省内视图没派发 click 也能出卡片。
+
+      // 手机端：手指点（几乎没移动）→ 当作点了一下
       let touchStartX = 0, touchStartY = 0, touchStartAt = 0;
       holder.addEventListener('touchstart', function (e) {
         const t0 = e.touches && e.touches[0];
@@ -1328,7 +965,6 @@ return null;
         const rect = holder.getBoundingClientRect();
         const name = pickByPoint(t1.clientX - rect.left, t1.clientY - rect.top);
         if (!name) { hideTooltipNow(); return; }
-        // 与 ECharts 的 click 走同一套规则（第一次点出卡片、再点同一个省下钻）
         handleAreaTap(name);
       }, { passive: true });
     })();
@@ -1373,6 +1009,7 @@ return null;
       if (t0 && tooltipEl && (t0 === tooltipEl || tooltipEl.contains(t0))) return;
       if (currentHoverName) hideTooltipNow();
     }, { passive: true });
+
 
     window.addEventListener('resize', () => myChart.resize());
   </script>
