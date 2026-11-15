@@ -385,7 +385,49 @@
     }
 
 
-    const myChart = echarts.init(document.getElementById('map'));
+    // ★ iOS 上「看不到地图」的元凶：echarts.init 在这一刻就把画布尺寸定死了。
+    //   页面在这个脚本执行时还在布局中（或者 Safari/Edge 用了一个中间宽度），
+    //   ECharts 之后不会有任何自动 resize（只有 window.resize 时才 resize，
+    //   而手机打开页面时根本不触发 resize），于是画布尺寸与实际容器不符 →
+    //   地图被画到屏幕外，页面看着一片空白（电脑上窗口大、初始尺寸刚好对得上，所以正常）。
+    //   这里：① 用显式的容器尺寸初始化；② 之后多时机强制 resize 一次。
+    const mapHolder = document.getElementById('map');
+    function holderSize() {
+      const w = mapHolder.clientWidth || window.innerWidth || 0;
+      const h = mapHolder.clientHeight || window.innerHeight || 0;
+      return { w: w, h: h };
+    }
+    const __initSize = holderSize();
+    const myChart = echarts.init(mapHolder, null, {
+      width: __initSize.w || undefined,
+      height: __initSize.h || undefined,
+      devicePixelRatio: window.devicePixelRatio || 1
+    });
+
+    // 容器尺寸变了就重新量一次并 resize（手机第一次布局完成、转屏、输入法弹出都会走到这里）
+    function fitMap() {
+      try {
+        if (!myChart) return;
+        myChart.resize();
+      } catch (e) { }
+    }
+    window.addEventListener('resize', fitMap);
+    window.addEventListener('orientationchange', function () { setTimeout(fitMap, 120); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) fitMap(); });
+    [0, 60, 200, 500, 1000, 2000].forEach(function (ms) { setTimeout(fitMap, ms); });
+    // 容器尺寸真的变化时才触发（避免死循环）
+    var __lastW = 0, __lastH = 0;
+    if (window.ResizeObserver) {
+      try {
+        new ResizeObserver(function () {
+          var s = holderSize();
+          if (!s.w || !s.h) return;
+          if (Math.abs(s.w - __lastW) < 2 && Math.abs(s.h - __lastH) < 2) return;
+          __lastW = s.w; __lastH = s.h;
+          fitMap();
+        }).observe(mapHolder);
+      } catch (e) { }
+    }
 
 
 
@@ -760,7 +802,13 @@
               type: 'map',
               map: currentMapName,
               roam: true,
-              zoom: 1.1,
+              // ★ 布局用「占满容器 + 按容器比例适配」，不要只靠 zoom 死撑：
+              //   手机上竖屏容器又高又窄，默认 1:0.75 的 aspect 加上 zoom 1.1 会把省图挤成一条
+              //   偏在角落里的小块（甚至会跑到可视区域之外），controller 上看起来就是「没地图」。
+              layoutCenter: ['50%', '50%'],
+              layoutSize: '96%',
+              aspectScale: 0.9,
+              zoom: isMobile ? 1 : 1.1,
               label: { show: true, fontSize: isMobile ? 7 : 10, color: '#333', formatter: function (params) { return suppressNames.indexOf(params.name) >= 0 ? '' : getTranslatedName(params.name); } },
               itemStyle: { areaColor: '#e8ecf1', borderColor: '#ffffff', borderWidth: 1 },
               selectedMode: false,
@@ -818,7 +866,11 @@
             type: 'map',
             map: currentMapName,
             roam: true,
-            zoom: isMobile ? 1.2 : 1.5,
+            // ★ 同省视图：占满容器并按容器比例适配（手机竖屏才不会把地图甩到可视区外）
+            layoutCenter: ['50%', '50%'],
+            layoutSize: '96%',
+            aspectScale: 0.9,
+            zoom: isMobile ? 1 : 1.2,
             center: [104, 36],
             label: {
               show: true,
