@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="referrer" content="no-referrer" />
   <title>中国地景 - HorizonSimLabs</title>
   <link rel="icon" href="../HorizonSimLabs.png" type="image/png">
@@ -84,17 +84,6 @@
     const backBtn = document.getElementById('back-btn');
     // ★ 只按 UA 判定手机：用 'ontouchstart' in window 会把触屏笔记本误判成手机
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    // ★ 视图缩放：手机上 maximum-scale=1.0/user-scalable=no 会让 ECharts 画布按 980px 布局视口算，
-    //   地图被画到屏幕外。这里在脚本运行前把 meta 改回 device-width。
-    (function () {
-      try {
-        var metas = document.querySelectorAll('meta[name="viewport"]');
-        for (var i = 0; i < metas.length; i++) {
-          metas[i].setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
-        }
-      } catch (e) { }
-    })();
 
     // 加载提示做成浅色胶囊，保证任何背景上都看得见
     (function () {
@@ -703,40 +692,13 @@
     }
 
     // ==================== 地图容器 ====================
-    // ★ 手机上脚本执行时页面还在布局，容器 clientWidth 可能是 0，ECharts 会按 0 建画布，
-    //   之后又不会自己 resize → 整页空白。所以显式量尺寸，拿不到就退回 window 尺寸。
+    // ★ 与 scenery.html 保持完全一致的写法：不传显式尺寸、不手动 resize 编排，
+    //   交给 ECharts 自己量容器。scenery.html 在手机上一直正常，说明这套最稳。
+    //   （之前改成显式 width/height + ResizeObserver + 多次 fitMap，反而在手机上
+    //     一直卡在「正在加载」，已回退。）
     const mapHolder = document.getElementById('map');
-    function holderSize() {
-      const w = mapHolder.clientWidth || window.innerWidth || 0;
-      const h = mapHolder.clientHeight || window.innerHeight || 0;
-      return { w: w, h: h };
-    }
-    const __initSize = holderSize();
-    const myChart = echarts.init(mapHolder, null, {
-      width: __initSize.w || undefined,
-      height: __initSize.h || undefined,
-      devicePixelRatio: window.devicePixelRatio || 1
-    });
-
-    function fitMap() {
-      try { if (myChart) myChart.resize(); } catch (e) { }
-    }
-    window.addEventListener('resize', fitMap);
-    window.addEventListener('orientationchange', function () { setTimeout(fitMap, 120); });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) fitMap(); });
-    [0, 60, 200, 500, 1000, 2000].forEach(function (ms) { setTimeout(fitMap, ms); });
-    var __lastW = 0, __lastH = 0;
-    if (window.ResizeObserver) {
-      try {
-        new ResizeObserver(function () {
-          var sz = holderSize();
-          if (!sz.w || !sz.h) return;
-          if (Math.abs(sz.w - __lastW) < 2 && Math.abs(sz.h - __lastH) < 2) return;
-          __lastW = sz.w; __lastH = sz.h;
-          fitMap();
-        }).observe(mapHolder);
-      } catch (e) { }
-    }
+    const myChart = echarts.init(mapHolder);
+    window.addEventListener('resize', function () { myChart.resize(); });
 
 
     async function initApp() {
